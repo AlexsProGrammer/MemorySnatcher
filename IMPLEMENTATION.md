@@ -1,87 +1,72 @@
-This is an excellent decision. Transitioning to a local-first architecture with Tauri is the most robust, privacy-compliant, and cost-effective way to handle massive personal data exports. It entirely bypasses the server-cost and GDPR nightmares.
-
-Here is your highly detailed, executable blueprint. You can save this directly as `IMPLEMENTATION.md` in your project root. 
-
-***
-
 ```markdown
 # IMPLEMENTATION.md
 
 ## 1. Project Context & Architecture
-- **Goal:** Build a privacy-first, local Desktop & Mobile application (Tauri v2) to parse, download, and process Snapchat Memories. The app will fetch media from Snapchat's CDN, merge visual overlays, inject EXIF metadata, and save files locally without relying on external servers.
+- **Goal:** Refactor the existing React monolithic frontend into a Feature-Sliced Design and implement the Rust backend for a Production-Grade Local Media Vault. Features include ZIP/JSON extraction, SQLite-based deduplication (handling multi-part videos), a two-state download/process pipeline, a virtualized local media viewer, and configurable rate limiting.
 - **Tech Stack & Dependencies:**
-  - **Framework:** Tauri v2 (`npm create tauri-app@latest`)
-  - **Frontend:** React 18+, Tailwind CSS, Shadcn UI (`npm install tailwindcss lucide-react framer-motion`)
-  - **Backend:** Rust 1.80+
-  - **Rust Crates:** `serde_json` (parsing), `tokio` (async runtime), `reqwest` (HTTP client), `kamadak-exif` (metadata), `rusqlite` or `tauri-plugin-sql` (local state), `ffmpeg-next` (media processing).
+  - **Frontend:** React, Tailwind CSS, Shadcn UI (`npm install @tanstack/react-virtual lucide-react react-router-dom`)
+  - **Backend:** Tauri v2 (Rust 1.80+)
+  - **Rust Crates:** `cargo add serde_json zip tokio reqwest tauri-plugin-sql sha2`
 - **File Structure:**
   ```text
-  ├── .github/
-  │   ├── agents/
-  │   ├── docs/
-  │   └── prompts/
-  ├── src/                # React Frontend
-  │   ├── components/     # Shadcn UI components
-  │   └── lib/            # Frontend utilities
-  ├── src-tauri/          # Rust Backend
-  │   ├── src/
-  │   │   ├── commands/   # Tauri IPC commands
-  │   │   ├── core/       # Download & EXIF logic
-  │   │   └── db/         # SQLite operations
-  │   ├── Cargo.toml
-  │   └── tauri.conf.json
+  ├── src/
+  │   ├── components/layout/   # Mobile-responsive Bottom/Top Tabs
+  │   ├── features/
+  │   │   ├── downloader/      # ZIP/JSON Dropzone, Two-Button Workflow
+  │   │   ├── viewer/          # Virtualized Grid
+  │   │   └── settings/        # Rate Limits, Paths
+  │   ├── lib/                 # DB, API, Utils
+  │   └── App.tsx              # Tab Routing
+  ├── src-tauri/src/
+  │   ├── commands/            # Tauri IPC Endpoints
+  │   ├── core/                # ZIP extractor, Downloader, FFmpeg
+  │   └── db/                  # SQLite Initialization & Queries
   ```
-- **Attention Points:** - Snapchat CDN links expire within ~24 hours; state management must handle resuming and requesting new JSON files.
-  - Media processing (FFmpeg overlay merging) is CPU-intensive and must run on background threads to prevent UI freezing.
-  - Mobile targets (iOS/Android) require strict file-system permission handling and background-task configuration.
+- **Attention Points:** - Never load full-resolution MP4s/JPEGs into the Viewer; only load generated WebP thumbnails.
+  - Rate limiting is critical to avoid IP bans from Snapchat's AWS.
+  - Deduplication must handle multi-part videos by grouping multiple media URLs under a single Memory ID.
 
 ## 2. Execution Phases
 
-### Phase 1: Universal AI Workspace Initializer
-- [x] **Step 1.1:** Create `.github/copilot-instructions.md` defining the Tauri v2 (Rust/React) stack, strict TypeScript rules, and Rust clippy standards.
-- [x] **Step 1.2:** Create `.github/docs/architecture-blueprint.md` mapping the IPC bridge between `src/` (React) and `src-tauri/src/commands/` (Rust).
-- [x] **Step 1.3:** Create `.github/agents/architect.agent.md` (Tools: `[read, search]`, Persona: System planner) and `.github/agents/engineer.agent.md` (Tools: `[read, edit, execute]`, Persona: Senior Developer).
-- [x] **Step 1.4:** Create `.github/prompts/` containing `plan.prompt.md`, `execute.prompt.md`, `debug.prompt.md`, and `explain.prompt.md` with the required semantic versioning directives.
-- [x] **Verification:** Run `ls -R .github` to verify all agent, docs, and prompt files exist and are correctly populated.
+### Phase 1: Frontend Modularity & Routing
+- [x] **Step 1.1:** In `src/App.tsx`, remove existing monolithic UI code and implement a Tab-based layout (Downloader, Viewer, Settings) using standard state or a router. Place tabs at the bottom for mobile screens (`max-md:bottom-0 max-md:fixed`).
+- [x] **Step 1.2:** Create directories `src/features/downloader`, `src/features/viewer`, and `src/features/settings`.
+- [x] **Step 1.3:** Move the existing Shadcn UI elements (Cards, Progress, Buttons) from the monolith into placeholder components within their respective `features/` folders.
+- [x] **Verification:** Run `npm run tauri dev`. Verify the app launches, the tab navigation works, and the UI adapts to mobile dimensions without errors.
 
-### Phase 2: Scaffolding & Core Architecture
-- [x] **Step 2.1:** Initialize the Tauri v2 application using `npm create tauri-app@latest` (Select React, TypeScript, Tailwind).
-- [x] **Step 2.2:** Install frontend dependencies for UI (`shadcn/ui` components like Progress, Card, Button).
-- [x] **Step 2.3:** In `src-tauri/Cargo.toml`, add `serde`, `serde_json`, `tokio`, `reqwest`, and `tauri-plugin-sql`.
-- [x] **Step 2.4:** Configure `tauri.conf.json` to allow file system access to the user's `Downloads` and `Picture` directories.
-- [x] **Verification:** Run `npm run tauri dev`. Verify the baseline desktop window opens without errors.
+### Phase 2: Rust Backend - ZIP Extraction & Validation
+- [ ] **Step 2.1:** In `src-tauri/src/core/parser.rs`, create a function using the `zip` crate to extract `memories_history.json` into a temporary system directory if the input is a `.zip`. If the input is `.json`, read it directly.
+- [ ] **Step 2.2:** In the same file, use `serde_json` to validate the JSON schema matches the expected Snapchat export format.
+- [ ] **Step 2.3:** In `src-tauri/src/commands/file.rs`, expose `#[tauri::command] validate_memory_file(path: String)` returning a boolean or error string to React.
+- [ ] **Verification:** Call `invoke('validate_memory_file', { path: "test.zip" })` from the React console and verify it successfully extracts and parses a valid mock file.
 
-### Phase 3: State Management & Database
-- [x] **Step 3.1:** Initialize `tauri-plugin-sql` in `src-tauri/src/main.rs` to create a local `memories.db` SQLite file.
-- [x] **Step 3.2:** Create a Rust module `src-tauri/src/db/` and write queries to initialize tables: `MemoryItem` (id, date, location, media_url, overlay_url, status) and `ExportJob` (status, total_files, downloaded_files).
-- [x] **Step 3.3:** Expose Tauri commands (`#[tauri::command]`) to read/write job state from the React frontend.
-- [ ] **Verification:** Call the `get_job_state` command from the React frontend console and verify it returns valid JSON.
+### Phase 3: SQLite Deduplication & Multi-Part Video Handling
+- [ ] **Step 3.1:** In `src-tauri/src/db/schema.rs`, initialize `tauri-plugin-sql` and create a `Memories` table (id, hash, date, status). The `hash` is generated via `sha2` using Date + Media Type to ensure deduplication across 6-month updates.
+- [ ] **Step 3.2:** In the same file, create a `MediaChunks` table (id, memory_id, url, overlay_url, order_index) with a foreign key to `Memories`. This allows multiple 10-second video split URLs to belong to one single Memory.
+- [ ] **Step 3.3:** In `src-tauri/src/core/parser.rs`, write the logic to iterate through the parsed JSON, generate hashes, and execute `INSERT OR IGNORE` into `Memories`, followed by inserting into `MediaChunks`.
+- [ ] **Verification:** Parse a JSON file twice. Query the SQLite DB and verify that `Memories` count remains the same (no duplicates) and multi-part videos have corresponding rows in `MediaChunks`.
 
-### Phase 4: Parsing & Download Engine
-- [x] **Step 4.1:** Write a Rust function in `src-tauri/src/core/parser.rs` to read the user-provided `memories_history.json` and insert the records into the SQLite database.
-- [x] **Step 4.2:** Implement a concurrent download manager in `src-tauri/src/core/downloader.rs` using `tokio::spawn` and `reqwest`, limiting concurrency to 10 parallel downloads to avoid local network saturation.
-- [x] **Step 4.3:** Emit download progress events from Rust to the React frontend using Tauri's `Window::emit`.
-- [x] **Verification:** Feed a mock `memories_history.json` into the parser and verify that 10 files are successfully downloaded to a temporary local folder.
+### Phase 4: The Two-Button Workflow (Download & Process)
+- [ ] **Step 4.1:** In `src/features/downloader/components/Workflow.tsx`, implement the UI state: Show "Start Download" if un-downloaded chunks exist. Switch button to "Process Files" when downloads complete.
+- [ ] **Step 4.2:** In `src-tauri/src/core/downloader.rs`, implement `download_media` using `reqwest`. Download files to a `.raw_cache` folder. Update DB status.
+- [ ] **Step 4.3:** In `src-tauri/src/core/processor.rs`, implement `process_media`. Read from `.raw_cache`, run FFmpeg `concat` (for multi-part videos) and overlay burns, inject EXIF, generate a 300x300 `webp` thumbnail to `.thumbnails`, and move the final file to the user's export path.
+- [ ] **Step 4.4:** Emit progress events from Rust to update the Progress UI in React.
+- [ ] **Verification:** Click "Start Download" -> observe files in `.raw_cache`. Click "Process Files" -> observe processed files in output and `.webp` files in `.thumbnails`.
 
-### Phase 5: Media Processing (Overlays & Metadata)
-- [x] **Step 5.1:** Implement FFmpeg logic in `src-tauri/src/core/media.rs` to overlay the transparent PNG (if it exists) onto the base MP4/JPEG file.
-- [x] **Step 5.2:** Use `kamadak-exif` (or `exiv2` bindings) to write the GPS coordinates and "Date Taken" from the database into the EXIF headers of the final merged files.
-- [x] **Step 5.3:** Implement a cleanup function to delete the raw downloaded files and overlays, keeping only the final merged file.
-- [ ] **Verification:** Run the processing command on a test image. Use `exiftool test_image.jpg` in the terminal to verify the GPS and Date timestamps are correctly embedded.
+### Phase 5: Virtualized Viewer
+- [ ] **Step 5.1:** In `src/features/viewer/components/Grid.tsx`, implement `@tanstack/react-virtual`.
+- [ ] **Step 5.2:** Create a Rust command `get_thumbnails(offset, limit)` to query the SQLite DB for processed memories and return local file paths to the `.thumbnails` folder.
+- [ ] **Step 5.3:** Connect the virtualized grid to the Tauri command, rendering `<img>` tags mapping to the local Tauri asset protocol (`convertFileSrc`).
+- [ ] **Verification:** Populate the DB with 5,000 mock entries. Scroll the Viewer rapidly. Verify memory usage in Task Manager remains stable (no memory leaks or DOM node explosion).
 
-### Phase 6: UI/UX & Mobile Adaptation
-- [x] **Step 6.1:** Build the React dashboard in `src/App.tsx` featuring a Dropzone for the JSON file, a location selector for the export directory, and a real-time Progress Bar listening to Tauri events.
-- [x] **Step 6.2:** Implement a "Resume Export" UI state. If links are expired (HTTP 403 from Snapchat), prompt the user to "Upload new JSON to resume".
-- [x] **Step 6.3:** Configure mobile capabilities in `src-tauri/gen/android/` and `src-tauri/gen/apple/` to request native Photos/Storage permissions.
-- [x] **Verification:** Run `npm run tauri android build` and ensure the `.apk` compiles successfully with the correct manifest permissions.
+### Phase 6: Settings & Rate Limiting
+- [ ] **Step 6.1:** In `src/features/settings/components/SettingsForm.tsx`, create an input for "Requests per Minute" and "Concurrent Downloads". Show a red warning text if Requests per Minute > 100 or Concurrent > 5.
+- [ ] **Step 6.2:** Save these settings in local storage or SQLite.
+- [ ] **Step 6.3:** In `src-tauri/src/core/downloader.rs`, wrap the `tokio` HTTP requests in a `tokio::sync::Semaphore` initialized with the "Concurrent Downloads" setting, and implement a time delay to respect "Requests per Minute".
+- [ ] **Verification:** Set rate limit to 10 RPM. Start download. Verify via console logs that Rust waits ~6 seconds between HTTP requests.
 
 ## 3. Global Testing Strategy
-Once all phases are complete, validate the following critical path edge cases:
-1. **The 24-Hour Expiration:** Start a download, forcefully disconnect the network, simulate a 24-hour wait (by manually replacing the media URLs in SQLite with expired ones), reconnect, and verify the app successfully prompts for a new JSON file and resumes exactly where it left off without duplicating files.
-2. **Mobile Backgrounding:** On a physical mobile device, start a 5GB export, minimize the app to the background, open another heavy app (like a game), return after 10 minutes, and verify the download continued or paused gracefully without corrupting the SQLite state.
-3. **Storage Quota:** Deliberately fill the target hard drive/device storage, attempt to download a memory, and verify the app catches the `Disk Full` I/O error and surfaces a clear, actionable UI alert to the user instead of silently crashing.
+1. **The Incremental Update (6-Month Scenario):** Load a JSON file with 10 memories. Download and process them. Alter the JSON to include 5 *new* memories and 5 *old* ones. Upload it again. Verify the app skips downloading/processing the 5 old ones and exclusively targets the 5 new ones.
+2. **The Multi-Part Video Stitch:** Provide a mocked JSON where a 30-second video is split into three 10-second AWS URLs. Download and process. Verify the output is exactly ONE 30-second `.mp4` file that plays seamlessly.
+3. **The Mobile Crash Test:** On Android, set rate limits to maximum (triggering the warning). Attempt to download 500 files while simultaneously scrolling the Virtualized Viewer aggressively. Ensure the UI thread does not freeze.
 ```
-
-***
-
-**Next Step:** Are you ready to initialize the project and execute Phase 1, or do you need to adjust any of the target directories before the Engineer agent takes over?
