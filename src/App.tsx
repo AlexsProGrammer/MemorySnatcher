@@ -1,6 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -11,23 +9,36 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import {
+  type ExportJobState,
+  getJobState,
+  processDownloadedMemories,
+  downloadQueuedMemories,
+  importMemoriesJson,
+  onDownloadProgress,
+  resumeExportDownloads,
+  type DownloadProgressPayload,
+} from "@/lib/memories-api";
 
-type DownloadProgressPayload = {
-  totalFiles: number;
-  completedFiles: number;
-  successfulFiles: number;
-  failedFiles: number;
-  memoryItemId: number | null;
-  status: string;
-  errorMessage: string | null;
-};
+type WorkflowState =
+  | "IDLE"
+  | "IMPORTED"
+  | "RUNNING"
+  | "PAUSED_EXPIRED"
+  | "PAUSED_ERROR"
+  | "RESUMABLE"
+  | "COMPLETED";
 
 function App() {
   const [selectedJsonName, setSelectedJsonName] = useState<string>("");
   const [isDropzoneActive, setIsDropzoneActive] = useState(false);
   const [outputDirectory, setOutputDirectory] = useState("");
   const [isDownloading, setIsDownloading] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [keepOriginals, setKeepOriginals] = useState(false);
   const [needsJsonResume, setNeedsJsonResume] = useState(false);
+  const [workflowState, setWorkflowState] = useState<WorkflowState>("IDLE");
+  const [jobState, setJobState] = useState<ExportJobState | null>(null);
   const [statusMessage, setStatusMessage] = useState(
     "Upload your memories JSON and choose an export folder.",
   );
@@ -38,6 +49,7 @@ function App() {
     failedFiles: 0,
     memoryItemId: null,
     status: "idle",
+    errorCode: null,
     errorMessage: null,
   });
 
@@ -46,32 +58,97 @@ function App() {
   useEffect(() => {
     let isMounted = true;
 
-    const unlistenPromise = listen<DownloadProgressPayload>(
-      "download-progress",
-      (event) => {
+    const applyJobState = (nextJobState: ExportJobState): void => {
+      setJobState(nextJobState);
+
+      switch (nextJobState.status) {
+        case "running":
+          setWorkflowState("RUNNING");
+          break;
+        case "paused_expired":
+          setNeedsJsonResume(true);
+          setWorkflowState("PAUSED_EXPIRED");
+          break;
+        case "paused_retryable":
+          setWorkflowState("RESUMABLE");
+          break;
+        case "completed_with_failures":
+          setWorkflowState("PAUSED_ERROR");
+          break;
+        case "completed":
+          setWorkflowState("COMPLETED");
+          break;
+        default:
+          if (selectedJsonName.length > 0) {
+            setWorkflowState("IMPORTED");
+          } else {
+            setWorkflowState("IDLE");
+          }
+          break;
+      }
+    };
+
+    const refreshJobState = async (): Promise<void> => {
+      const nextJobState = await getJobState();
+      if (!isMounted) {
+        return;
+      }
+
+      applyJobState(nextJobState);
+    };
+
+    const unlistenPromise = onDownloadProgress((payload) => {
+      if (!isMounted) {
+        return;
+      }
+
+      if (payload.status === "error" && payload.errorCode === "EXPIRED_LINK") {
+        setNeedsJsonResume(true);
+        setWorkflowState("PAUSED_EXPIRED");
+        setStatusMessage("Upload new JSON to resume");
+      }
+
+      if (payload.status === "success") {
+        setWorkflowState("RUNNING");
+      }
+
+      setProgressPayload(payload);
+    });
+
+    void getJobState()
+      .then((nextJobState) => {
         if (!isMounted) {
           return;
         }
 
-        if (
-          event.payload.status === "error" &&
-          event.payload.errorMessage?.includes("403")
-        ) {
-          setNeedsJsonResume(true);
-          setStatusMessage("Upload new JSON to resume");
+        applyJobState(nextJobState);
+
+        if (nextJobState.totalFiles > 0) {
+          setStatusMessage(
+            `Job state: ${nextJobState.status} (${nextJobState.downloadedFiles}/${nextJobState.totalFiles})`,
+          );
+        }
+      })
+      .catch(() => {
+        if (!isMounted) {
+          return;
         }
 
-        setProgressPayload(event.payload);
-      },
-    );
+        setStatusMessage((currentStatus) => currentStatus);
+      });
+
+    const interval = window.setInterval(() => {
+      void refreshJobState().catch(() => undefined);
+    }, 3000);
 
     return () => {
       isMounted = false;
+      window.clearInterval(interval);
       void unlistenPromise.then((unlisten) => {
         unlisten();
       });
     };
-  }, []);
+  }, [selectedJsonName.length]);
 
   const progressPercent = useMemo(() => {
     if (progressPayload.totalFiles === 0) {
@@ -83,20 +160,37 @@ function App() {
     );
   }, [progressPayload.completedFiles, progressPayload.totalFiles]);
 
-  function handleFilesSelected(files: FileList | null): void {
+  async function handleFilesSelected(files: FileList | null): Promise<void> {
     const file = files?.[0];
     if (!file) {
       return;
     }
 
     setSelectedJsonName(file.name);
-    if (needsJsonResume) {
-      setNeedsJsonResume(false);
-      setStatusMessage(`Selected JSON: ${file.name}. Ready to resume export.`);
-      return;
-    }
+    setStatusMessage(`Importing ${file.name}...`);
 
-    setStatusMessage(`Selected JSON: ${file.name}`);
+    try {
+      const jsonContent = await file.text();
+      const importResult = await importMemoriesJson(jsonContent);
+
+      if (needsJsonResume) {
+        setNeedsJsonResume(false);
+        setWorkflowState("RESUMABLE");
+        setStatusMessage(
+          `Selected JSON: ${file.name}. Ready to resume export. Imported ${importResult.importedCount}, skipped ${importResult.skippedDuplicates}.`,
+        );
+        return;
+      }
+
+      setWorkflowState("IMPORTED");
+      setStatusMessage(
+        `Selected JSON: ${file.name}. Imported ${importResult.importedCount}/${importResult.parsedCount} memories (skipped duplicates: ${importResult.skippedDuplicates}).`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unexpected import error.";
+      setStatusMessage(`Failed to import JSON: ${errorMessage}`);
+    }
   }
 
   async function startDownload(): Promise<void> {
@@ -106,27 +200,64 @@ function App() {
     }
 
     setIsDownloading(true);
+    setWorkflowState("RUNNING");
     setStatusMessage("Downloading queued memories...");
 
     try {
-      const downloadedCount = await invoke<number>("download_queued_memories", {
-        outputDir: outputDirectory,
-      });
+      const downloadedCount = await downloadQueuedMemories(outputDirectory);
 
       setStatusMessage(`Download completed. ${downloadedCount} file(s) saved.`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : "Unexpected download error.";
-
-      if (errorMessage.includes("403")) {
-        setNeedsJsonResume(true);
-        setStatusMessage("Upload new JSON to resume");
-        return;
-      }
-
       setStatusMessage(`Download failed: ${errorMessage}`);
     } finally {
       setIsDownloading(false);
+    }
+  }
+
+  async function resumeDownload(): Promise<void> {
+    if (outputDirectory.trim().length === 0) {
+      setStatusMessage("Select an export directory before resuming download.");
+      return;
+    }
+
+    setIsDownloading(true);
+    setWorkflowState("RUNNING");
+    setStatusMessage("Resuming export downloads...");
+
+    try {
+      const resumedCount = await resumeExportDownloads(outputDirectory);
+      setStatusMessage(`Resume completed. ${resumedCount} file(s) downloaded.`);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unexpected resume error.";
+      setStatusMessage(`Resume failed: ${errorMessage}`);
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  async function processMemories(): Promise<void> {
+    if (outputDirectory.trim().length === 0) {
+      setStatusMessage("Select an export directory before processing files.");
+      return;
+    }
+
+    setIsProcessing(true);
+    setStatusMessage("Processing downloaded memories...");
+
+    try {
+      const result = await processDownloadedMemories(outputDirectory, keepOriginals);
+      setStatusMessage(
+        `Processing completed. Processed ${result.processedCount}, failed ${result.failedCount}.`,
+      );
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Unexpected processing error.";
+      setStatusMessage(`Processing failed: ${errorMessage}`);
+    } finally {
+      setIsProcessing(false);
     }
   }
 
@@ -134,6 +265,9 @@ function App() {
     progressPayload.totalFiles > 0
       ? `${progressPayload.completedFiles}/${progressPayload.totalFiles}`
       : "0/0";
+
+  const canResume = workflowState === "RESUMABLE" || workflowState === "PAUSED_ERROR";
+  const canStart = workflowState === "IDLE" || workflowState === "IMPORTED" || workflowState === "COMPLETED";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-3xl items-center px-4 py-8">
@@ -144,6 +278,10 @@ function App() {
             Upload export JSON, choose a destination folder, and track download
             progress in real time.
           </CardDescription>
+          <p className="text-xs text-muted-foreground">
+            Workflow state: {workflowState}
+            {jobState ? ` · Job ${jobState.status} (${jobState.downloadedFiles}/${jobState.totalFiles})` : ""}
+          </p>
         </CardHeader>
 
         <CardContent className="space-y-6">
@@ -164,7 +302,7 @@ function App() {
               onDrop={(event) => {
                 event.preventDefault();
                 setIsDropzoneActive(false);
-                handleFilesSelected(event.dataTransfer.files);
+                void handleFilesSelected(event.dataTransfer.files);
               }}
             >
               <p>
@@ -186,7 +324,7 @@ function App() {
                   className="hidden"
                   type="file"
                   accept="application/json,.json"
-                  onChange={(event) => handleFilesSelected(event.target.files)}
+                  onChange={(event) => void handleFilesSelected(event.target.files)}
                 />
               </div>
             </div>
@@ -223,11 +361,44 @@ function App() {
             </p>
           </section>
 
+          <section className="flex items-center justify-between rounded-lg border border-border px-3 py-2 text-sm">
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={keepOriginals}
+                onChange={(event) => setKeepOriginals(event.currentTarget.checked)}
+              />
+              Keep original downloaded files after processing
+            </label>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void processMemories()}
+              disabled={isProcessing}
+            >
+              {isProcessing ? "Processing..." : "Process files"}
+            </Button>
+          </section>
+
           <section className="flex items-center justify-between gap-3">
             <p className="text-xs text-muted-foreground">{statusMessage}</p>
-            <Button type="button" onClick={() => void startDownload()} disabled={isDownloading}>
-              {isDownloading ? "Downloading..." : "Start export"}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => void resumeDownload()}
+                disabled={isDownloading || !canResume}
+              >
+                Resume export
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void startDownload()}
+                disabled={isDownloading || !canStart}
+              >
+                {isDownloading ? "Downloading..." : "Start export"}
+              </Button>
+            </div>
           </section>
         </CardContent>
       </Card>

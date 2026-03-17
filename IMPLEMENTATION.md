@@ -42,7 +42,7 @@ Here is your highly detailed, executable blueprint. You can save this directly a
 - [x] **Step 1.2:** Create `.github/docs/architecture-blueprint.md` mapping the IPC bridge between `src/` (React) and `src-tauri/src/commands/` (Rust).
 - [x] **Step 1.3:** Create `.github/agents/architect.agent.md` (Tools: `[read, search]`, Persona: System planner) and `.github/agents/engineer.agent.md` (Tools: `[read, edit, execute]`, Persona: Senior Developer).
 - [x] **Step 1.4:** Create `.github/prompts/` containing `plan.prompt.md`, `execute.prompt.md`, `debug.prompt.md`, and `explain.prompt.md` with the required semantic versioning directives.
-- [ ] **Verification:** Run `ls -R .github` to verify all agent, docs, and prompt files exist and are correctly populated.
+- [x] **Verification:** Run `ls -R .github` to verify all agent, docs, and prompt files exist and are correctly populated.
 
 ### Phase 2: Scaffolding & Core Architecture
 - [x] **Step 2.1:** Initialize the Tauri v2 application using `npm create tauri-app@latest` (Select React, TypeScript, Tailwind).

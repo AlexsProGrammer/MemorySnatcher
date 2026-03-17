@@ -1,0 +1,75 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+
+export type DownloadErrorCode =
+  | "EXPIRED_LINK"
+  | "HTTP_ERROR"
+  | "IO_ERROR"
+  | "CONCURRENCY_ERROR"
+  | "INTERNAL_ERROR";
+
+export type DownloadProgressPayload = {
+  totalFiles: number;
+  completedFiles: number;
+  successfulFiles: number;
+  failedFiles: number;
+  memoryItemId: number | null;
+  status: string;
+  errorCode: DownloadErrorCode | null;
+  errorMessage: string | null;
+};
+
+export type ImportMemoriesResult = {
+  parsedCount: number;
+  importedCount: number;
+  skippedDuplicates: number;
+};
+
+export type ExportJobState = {
+  status: string;
+  totalFiles: number;
+  downloadedFiles: number;
+};
+
+export type ProcessMemoriesResult = {
+  processedCount: number;
+  failedCount: number;
+};
+
+export async function importMemoriesJson(
+  jsonContent: string,
+): Promise<ImportMemoriesResult> {
+  return invoke<ImportMemoriesResult>("import_memories_json", { jsonContent });
+}
+
+export async function downloadQueuedMemories(
+  outputDir: string,
+): Promise<number> {
+  return invoke<number>("download_queued_memories", { outputDir });
+}
+
+export async function resumeExportDownloads(outputDir: string): Promise<number> {
+  return invoke<number>("resume_export_downloads", { outputDir });
+}
+
+export async function getJobState(): Promise<ExportJobState> {
+  return invoke<ExportJobState>("get_job_state");
+}
+
+export async function processDownloadedMemories(
+  outputDir: string,
+  keepOriginals: boolean,
+): Promise<ProcessMemoriesResult> {
+  return invoke<ProcessMemoriesResult>("process_downloaded_memories", {
+    outputDir,
+    keepOriginals,
+  });
+}
+
+export async function onDownloadProgress(
+  callback: (payload: DownloadProgressPayload) => void,
+): Promise<UnlistenFn> {
+  return listen<DownloadProgressPayload>("download-progress", (event) => {
+    callback(event.payload);
+  });
+}
