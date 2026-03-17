@@ -43,6 +43,13 @@ struct ProcessProgressPayload {
     error_message: Option<String>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ThumbnailItem {
+    memory_item_id: i64,
+    thumbnail_path: String,
+}
+
 fn memories_db_url(app: &tauri::AppHandle) -> Result<String, String> {
     let mut app_config_dir = app
         .path()
@@ -465,6 +472,64 @@ async fn apply_metadata_to_output_files(
 }
 
 #[tauri::command]
+async fn get_thumbnails(
+    app: tauri::AppHandle,
+    offset: i64,
+    limit: i64,
+) -> Result<Vec<ThumbnailItem>, String> {
+    if offset < 0 {
+        return Err("offset must be greater than or equal to 0".to_string());
+    }
+
+    if limit <= 0 {
+        return Err("limit must be greater than 0".to_string());
+    }
+
+    let database_url = memories_db_url(&app)?;
+    let pool = sqlx::SqlitePool::connect(&database_url)
+        .await
+        .map_err(|error| format!("failed to connect to memories database: {error}"))?;
+
+    let rows = sqlx::query(
+        "
+        SELECT id
+        FROM MemoryItem
+        WHERE status = 'processed'
+        ORDER BY id DESC
+        LIMIT ?1 OFFSET ?2
+        ",
+    )
+    .bind(limit)
+    .bind(offset)
+    .fetch_all(&pool)
+    .await
+    .map_err(|error| format!("failed to query processed memories for thumbnails: {error}"))?;
+
+    pool.close().await;
+
+    let thumbnails_dir = std::path::Path::new(".raw_cache").join(".thumbnails");
+
+    let items = rows
+        .into_iter()
+        .filter_map(|row| {
+            let memory_item_id = row.get::<i64, _>("id");
+            let thumbnail_path = thumbnails_dir.join(format!("{memory_item_id}.webp"));
+
+            if !thumbnail_path.exists() {
+                return None;
+            }
+
+            Some(ThumbnailItem {
+                memory_item_id,
+                thumbnail_path: thumbnail_path.to_string_lossy().to_string(),
+            })
+        })
+        .collect::<Vec<_>>();
+
+    Ok(items)
+}
+
+#[tauri::command]
 async fn process_downloaded_memories(
     app: tauri::AppHandle,
     window: tauri::Window,
@@ -752,7 +817,8 @@ pub fn run() {
             download_queued_memories,
             resume_export_downloads,
             apply_metadata_to_output_files,
-            process_downloaded_memories
+            process_downloaded_memories,
+            get_thumbnails
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

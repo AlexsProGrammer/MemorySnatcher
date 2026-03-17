@@ -1,0 +1,80 @@
+import { useMemo, useRef } from "react";
+
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+type ThumbnailItem = {
+  id: string;
+  src?: string;
+};
+
+type GridProps = {
+  items: ThumbnailItem[];
+};
+
+const GRID_COLUMNS = 4;
+const ESTIMATED_ROW_HEIGHT = 140;
+const VIEWPORT_HEIGHT = 420;
+
+export function Grid({ items }: GridProps) {
+  const parentRef = useRef<HTMLDivElement>(null);
+
+  const rows = useMemo(() => {
+    const rowCount = Math.ceil(items.length / GRID_COLUMNS);
+    return Array.from({ length: rowCount }, (_, rowIndex) => {
+      const start = rowIndex * GRID_COLUMNS;
+      return items.slice(start, start + GRID_COLUMNS);
+    });
+  }, [items]);
+
+  const rowVirtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => ESTIMATED_ROW_HEIGHT,
+    overscan: 6,
+  });
+
+  return (
+    <div
+      ref={parentRef}
+      className="relative overflow-auto rounded-md border border-border"
+      style={{ height: VIEWPORT_HEIGHT }}
+    >
+      <div
+        className="relative w-full"
+        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+          const rowItems = rows[virtualRow.index] ?? [];
+
+          return (
+            <div
+              key={virtualRow.key}
+              className="absolute left-0 top-0 grid w-full grid-cols-2 gap-2 p-2 sm:grid-cols-4"
+              style={{ transform: `translateY(${virtualRow.start}px)` }}
+            >
+              {rowItems.map((item) => (
+                <div
+                  key={item.id}
+                  className="aspect-square overflow-hidden rounded-md border border-border bg-muted"
+                >
+                  {item.src ? (
+                    <img
+                      src={item.src}
+                      alt={`Thumbnail ${item.id}`}
+                      loading="lazy"
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center text-xs text-muted-foreground">
+                      {item.id}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

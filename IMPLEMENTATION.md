@@ -54,9 +54,9 @@
 - [ ] **Verification:** Click "Start Download" -> observe files in `.raw_cache`. Click "Process Files" -> observe processed files in output and `.webp` files in `.thumbnails`.
 
 ### Phase 5: Virtualized Viewer
-- [ ] **Step 5.1:** In `src/features/viewer/components/Grid.tsx`, implement `@tanstack/react-virtual`.
-- [ ] **Step 5.2:** Create a Rust command `get_thumbnails(offset, limit)` to query the SQLite DB for processed memories and return local file paths to the `.thumbnails` folder.
-- [ ] **Step 5.3:** Connect the virtualized grid to the Tauri command, rendering `<img>` tags mapping to the local Tauri asset protocol (`convertFileSrc`).
+- [x] **Step 5.1:** In `src/features/viewer/components/Grid.tsx`, implement `@tanstack/react-virtual`.
+- [x] **Step 5.2:** Create a Rust command `get_thumbnails(offset, limit)` to query the SQLite DB for processed memories and return local file paths to the `.thumbnails` folder.
+- [x] **Step 5.3:** Connect the virtualized grid to the Tauri command, rendering `<img>` tags mapping to the local Tauri asset protocol (`convertFileSrc`).
 - [ ] **Verification:** Populate the DB with 5,000 mock entries. Scroll the Viewer rapidly. Verify memory usage in Task Manager remains stable (no memory leaks or DOM node explosion).
 
 ### Phase 6: Settings & Rate Limiting

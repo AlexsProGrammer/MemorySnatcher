@@ -46,6 +46,11 @@ export type ProcessProgressPayload = {
   errorMessage: string | null;
 };
 
+export type ThumbnailItem = {
+  memoryItemId: number;
+  thumbnailPath: string;
+};
+
 export async function importMemoriesJson(
   jsonContent: string,
 ): Promise<ImportMemoriesResult> {
@@ -78,6 +83,13 @@ export async function processDownloadedMemories(
     outputDir,
     keepOriginals,
   });
+}
+
+export async function getThumbnails(
+  offset: number,
+  limit: number,
+): Promise<ThumbnailItem[]> {
+  return invoke<ThumbnailItem[]>("get_thumbnails", { offset, limit });
 }
 
 export async function onDownloadProgress(
