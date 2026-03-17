@@ -64,16 +64,16 @@ Here is your highly detailed, executable blueprint. You can save this directly a
 - [x] **Verification:** Feed a mock `memories_history.json` into the parser and verify that 10 files are successfully downloaded to a temporary local folder.
 
 ### Phase 5: Media Processing (Overlays & Metadata)
-- [ ] **Step 5.1:** Implement FFmpeg logic in `src-tauri/src/core/media.rs` to overlay the transparent PNG (if it exists) onto the base MP4/JPEG file.
-- [ ] **Step 5.2:** Use `kamadak-exif` (or `exiv2` bindings) to write the GPS coordinates and "Date Taken" from the database into the EXIF headers of the final merged files.
-- [ ] **Step 5.3:** Implement a cleanup function to delete the raw downloaded files and overlays, keeping only the final merged file.
+- [x] **Step 5.1:** Implement FFmpeg logic in `src-tauri/src/core/media.rs` to overlay the transparent PNG (if it exists) onto the base MP4/JPEG file.
+- [x] **Step 5.2:** Use `kamadak-exif` (or `exiv2` bindings) to write the GPS coordinates and "Date Taken" from the database into the EXIF headers of the final merged files.
+- [x] **Step 5.3:** Implement a cleanup function to delete the raw downloaded files and overlays, keeping only the final merged file.
 - [ ] **Verification:** Run the processing command on a test image. Use `exiftool test_image.jpg` in the terminal to verify the GPS and Date timestamps are correctly embedded.
 
 ### Phase 6: UI/UX & Mobile Adaptation
-- [ ] **Step 6.1:** Build the React dashboard in `src/App.tsx` featuring a Dropzone for the JSON file, a location selector for the export directory, and a real-time Progress Bar listening to Tauri events.
-- [ ] **Step 6.2:** Implement a "Resume Export" UI state. If links are expired (HTTP 403 from Snapchat), prompt the user to "Upload new JSON to resume".
-- [ ] **Step 6.3:** Configure mobile capabilities in `src-tauri/gen/android/` and `src-tauri/gen/apple/` to request native Photos/Storage permissions.
-- [ ] **Verification:** Run `npm run tauri android build` and ensure the `.apk` compiles successfully with the correct manifest permissions.
+- [x] **Step 6.1:** Build the React dashboard in `src/App.tsx` featuring a Dropzone for the JSON file, a location selector for the export directory, and a real-time Progress Bar listening to Tauri events.
+- [x] **Step 6.2:** Implement a "Resume Export" UI state. If links are expired (HTTP 403 from Snapchat), prompt the user to "Upload new JSON to resume".
+- [x] **Step 6.3:** Configure mobile capabilities in `src-tauri/gen/android/` and `src-tauri/gen/apple/` to request native Photos/Storage permissions.
+- [x] **Verification:** Run `npm run tauri android build` and ensure the `.apk` compiles successfully with the correct manifest permissions.
 
 ## 3. Global Testing Strategy
 Once all phases are complete, validate the following critical path edge cases:
