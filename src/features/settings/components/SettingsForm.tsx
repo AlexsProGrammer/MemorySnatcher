@@ -1,7 +1,12 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
-import { readAppSettings, writeAppSettings } from "@/lib/app-settings";
+import {
+  parseThemePreference,
+  readAppSettings,
+  writeAppSettings,
+  type ThemePreference,
+} from "@/lib/app-settings";
 import { parseLanguagePreference, type LanguagePreference } from "@/lib/language";
 import { useI18n } from "@/lib/i18n";
 
@@ -20,27 +25,46 @@ function clampNonNegativeInteger(value: string): number {
 type ThemeOption = "light" | "dark" | "system";
 const languageOptions: LanguagePreference[] = ["system", "en", "de"];
 
+function resolveThemePreference(value: string | undefined): ThemePreference {
+  if (typeof value !== "string") {
+    return "system";
+  }
+
+  return parseThemePreference(value);
+}
+
 export function SettingsForm() {
   const { theme, setTheme } = useTheme();
   const { languagePreference, resolvedLocale, setLanguagePreference, t } = useI18n();
   const [requestsPerMinute, setRequestsPerMinute] = useState<number>(10);
   const [concurrentDownloads, setConcurrentDownloads] = useState<number>(3);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
 
   useEffect(() => {
     const settings = readAppSettings();
     setRequestsPerMinute(settings.requestsPerMinute);
     setConcurrentDownloads(settings.concurrentDownloads);
+    setHasLoadedSettings(true);
   }, []);
 
   useEffect(() => {
-    const currentSettings = readAppSettings();
+    if (!hasLoadedSettings) {
+      return;
+    }
+
     writeAppSettings({
-      ...currentSettings,
       requestsPerMinute,
       concurrentDownloads,
       languagePreference,
+      themePreference: resolveThemePreference(theme),
     });
-  }, [concurrentDownloads, requestsPerMinute]);
+  }, [
+    concurrentDownloads,
+    hasLoadedSettings,
+    languagePreference,
+    requestsPerMinute,
+    theme,
+  ]);
 
   const showWarning = useMemo(
     () =>

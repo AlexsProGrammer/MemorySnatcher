@@ -2,17 +2,29 @@ import { parseLanguagePreference, type LanguagePreference } from "@/lib/language
 
 export const SETTINGS_STORAGE_KEY = "memorysnaper.rate-limit-settings";
 
+export type ThemePreference = "light" | "dark" | "system";
+
 export type AppSettings = {
   requestsPerMinute: number;
   concurrentDownloads: number;
   languagePreference: LanguagePreference;
+  themePreference: ThemePreference;
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
   requestsPerMinute: 10,
   concurrentDownloads: 3,
   languagePreference: "system",
+  themePreference: "system",
 };
+
+export function parseThemePreference(value: string | null): ThemePreference {
+  if (value === "light" || value === "dark" || value === "system") {
+    return value;
+  }
+
+  return "system";
+}
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
   if (typeof value !== "number" || !Number.isFinite(value)) {
@@ -42,11 +54,17 @@ function parseSettings(rawValue: string): AppSettings | null {
         ? (Reflect.get(parsedValue, "languagePreference") as string)
         : null,
     );
+    const themePreference = parseThemePreference(
+      typeof Reflect.get(parsedValue, "themePreference") === "string"
+        ? (Reflect.get(parsedValue, "themePreference") as string)
+        : null,
+    );
 
     return {
       requestsPerMinute,
       concurrentDownloads,
       languagePreference,
+      themePreference,
     };
   } catch {
     return null;
