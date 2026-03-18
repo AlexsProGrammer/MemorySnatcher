@@ -162,7 +162,8 @@ export function Workflow() {
         setJobState(currentJobState);
         setWorkflowStage(inferWorkflowStage(currentJobState));
         setHasDownloadableData(queuedCount > 0);
-      } catch {
+      } catch (error) {
+        console.error("[downloader] Failed to load initial job state", error);
         setNotice(t("downloader.workflow.status.loadingJobState"), "error");
       }
     };
@@ -175,6 +176,10 @@ export function Workflow() {
 
     const startListeners = async () => {
       unlistenDownload = await onDownloadProgress((payload: DownloadProgressPayload) => {
+        if (payload.status === "error") {
+          console.error("[downloader] Download progress error event", payload);
+        }
+
         setDownloadProgress({
           totalFiles: payload.totalFiles,
           completedFiles: payload.completedFiles,
@@ -197,6 +202,10 @@ export function Workflow() {
       });
 
       unlistenProcess = await onProcessProgress((payload: ProcessProgressPayload) => {
+        if (payload.status === "error") {
+          console.error("[downloader] Process progress error event", payload);
+        }
+
         setProcessProgress({
           totalFiles: payload.totalFiles,
           completedFiles: payload.completedFiles,
@@ -360,15 +369,31 @@ export function Workflow() {
   };
 
   const onStartDownload = async () => {
+    const rateLimitSettings = loadRateLimitSettings();
+
+    console.log("[downloader] Starting queued downloads", {
+      outputDir: ".raw_cache",
+      settings: rateLimitSettings,
+    });
+
     try {
       setNotice(t("downloader.workflow.status.downloading"));
       setDownloadProgress(null);
-      const downloadedCount = await downloadQueuedMemories(".raw_cache", loadRateLimitSettings());
+      const downloadedCount = await downloadQueuedMemories(".raw_cache", rateLimitSettings);
       const currentJobState = await getJobState();
       setJobState(currentJobState);
       setWorkflowStage(inferWorkflowStage(currentJobState));
       setNotice(t("downloader.workflow.status.downloaded", { count: downloadedCount }), "success");
-    } catch {
+      console.log("[downloader] Download command completed", {
+        downloadedCount,
+        jobState: currentJobState,
+      });
+    } catch (error) {
+      console.error("[downloader] downloadQueuedMemories failed", {
+        outputDir: ".raw_cache",
+        settings: rateLimitSettings,
+        error,
+      });
       setNotice(t("downloader.workflow.error.generic"), "error");
     }
   };
@@ -385,7 +410,12 @@ export function Workflow() {
         }),
         result.failedCount > 0 ? "error" : "success",
       );
-    } catch {
+    } catch (error) {
+      console.error("[downloader] processDownloadedMemories failed", {
+        outputDir: ".raw_cache",
+        keepOriginals: true,
+        error,
+      });
       setNotice(t("downloader.workflow.error.generic"), "error");
     }
   };

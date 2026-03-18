@@ -246,6 +246,11 @@ async fn download_queued_memories(
     requests_per_minute: Option<u32>,
     concurrent_downloads: Option<u32>,
 ) -> Result<usize, String> {
+    eprintln!(
+        "[downloader-debug] download_queued_memories start output_dir='{}' requests_per_minute={:?} concurrent_downloads={:?}",
+        output_dir, requests_per_minute, concurrent_downloads
+    );
+
     let database_url = memories_db_url(&app)?;
     let pool = sqlx::SqlitePool::connect(&database_url)
         .await
@@ -265,6 +270,11 @@ async fn download_queued_memories(
 
     let total_files = i64::try_from(rows.len())
         .map_err(|error| format!("failed to convert total resumable file count: {error}"))?;
+
+    eprintln!(
+        "[downloader-debug] queued rows loaded total_files={} output_dir='{}'",
+        total_files, output_dir
+    );
 
     sqlx::query(
         "
@@ -323,6 +333,11 @@ async fn download_queued_memories(
     .await
     .map_err(|error| format!("download manager failed: {error}"))?;
 
+    eprintln!(
+        "[downloader-debug] download manager returned result_count={}",
+        download_results.len()
+    );
+
     let mut successful_downloads = 0usize;
     let mut successful_media_ids = Vec::new();
 
@@ -368,6 +383,16 @@ async fn download_queued_memories(
                 .map_err(|error| format!("failed to update export job progress: {error}"))?;
             }
             Err(error) => {
+                eprintln!(
+                    "[downloader-debug] item failed memory_item_id={:?} error_code={:?} retryable={} http_status={:?} url={:?} error={}",
+                    error.memory_item_id(),
+                    error.error_code(),
+                    error.is_retryable(),
+                    error.http_status(),
+                    error.url(),
+                    error
+                );
+
                 if let Some(memory_item_id) = error.memory_item_id() {
                     let next_retry_count = retry_counts_by_id
                         .get(&memory_item_id)
@@ -379,6 +404,11 @@ async fn download_queued_memories(
                         &error.error_code(),
                         error.is_retryable(),
                         next_retry_count,
+                    );
+
+                    eprintln!(
+                        "[downloader-debug] item status transition memory_item_id={} next_retry_count={} next_status={}",
+                        memory_item_id, next_retry_count, next_status
                     );
 
                     sqlx::query(
@@ -433,6 +463,15 @@ async fn download_queued_memories(
 
         for result in overlay_results {
             if let Err(error) = result {
+                eprintln!(
+                    "[downloader-debug] overlay download failed memory_item_id={:?} error_code={:?} http_status={:?} url={:?} error={}",
+                    error.memory_item_id(),
+                    error.error_code(),
+                    error.http_status(),
+                    error.url(),
+                    error
+                );
+
                 if let Some(memory_item_id) = error.memory_item_id() {
                     sqlx::query(
                         "
@@ -502,6 +541,15 @@ async fn download_queued_memories(
     .execute(&pool)
     .await
     .map_err(|error| format!("failed to finalize export job state: {error}"))?;
+
+    eprintln!(
+        "[downloader-debug] download_queued_memories complete successful_downloads={} remaining_retryable={} remaining_expired={} remaining_failed={} final_status={}",
+        successful_downloads,
+        remaining_retryable,
+        remaining_expired,
+        remaining_failed,
+        final_status
+    );
 
     pool.close().await;
     Ok(successful_downloads)

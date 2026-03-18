@@ -173,6 +173,20 @@ impl DownloadError {
         }
     }
 
+    pub fn url(&self) -> Option<&str> {
+        match self {
+            Self::Http { url, .. } => Some(url.as_str()),
+            Self::Semaphore(_) | Self::Join(_) | Self::Io { .. } | Self::Emit(_) => None,
+        }
+    }
+
+    pub fn http_status(&self) -> Option<reqwest::StatusCode> {
+        match self {
+            Self::Http { source, .. } => source.status(),
+            Self::Semaphore(_) | Self::Join(_) | Self::Io { .. } | Self::Emit(_) => None,
+        }
+    }
+
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::Http { source, .. } => {
@@ -310,10 +324,24 @@ async fn download_single_task(
             Err(error) => {
                 let should_retry = attempt < MAX_TRANSIENT_RETRIES && error.is_retryable();
                 if !should_retry {
+                    eprintln!(
+                        "[downloader-debug] final failure memory_item_id={} attempt={} retryable={} error={}",
+                        task.memory_item_id,
+                        attempt + 1,
+                        error.is_retryable(),
+                        error
+                    );
                     return Err(error);
                 }
 
                 let backoff = BASE_RETRY_DELAY_MS * 2_u64.pow(attempt as u32);
+                eprintln!(
+                    "[downloader-debug] transient failure memory_item_id={} attempt={} retrying_in_ms={} error={}",
+                    task.memory_item_id,
+                    attempt + 1,
+                    backoff,
+                    error
+                );
                 tokio::time::sleep(Duration::from_millis(backoff)).await;
                 attempt += 1;
             }
