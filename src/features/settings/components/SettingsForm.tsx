@@ -24,7 +24,7 @@ type ThemeOption = "light" | "dark" | "system";
 
 export function SettingsForm() {
   const { theme, setTheme } = useTheme();
-  const [requestsPerMinute, setRequestsPerMinute] = useState<number>(60);
+  const [requestsPerMinute, setRequestsPerMinute] = useState<number>(10);
   const [concurrentDownloads, setConcurrentDownloads] = useState<number>(3);
 
   useEffect(() => {

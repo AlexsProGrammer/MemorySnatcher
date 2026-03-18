@@ -92,6 +92,10 @@ export async function getJobState(): Promise<ExportJobState> {
   return invoke<ExportJobState>("get_job_state");
 }
 
+export async function getQueuedCount(): Promise<number> {
+  return invoke<number>("get_queued_count");
+}
+
 export async function processDownloadedMemories(
   outputDir: string,
   keepOriginals: boolean,

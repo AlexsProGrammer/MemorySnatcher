@@ -1,7 +1,7 @@
 pub mod core;
-mod db;
 
 use serde::{Deserialize, Serialize};
+use sqlx::sqlite::SqliteConnectOptions;
 use sqlx::Row;
 use tauri::{Emitter, Manager};
 
@@ -51,20 +51,98 @@ struct ThumbnailItem {
 }
 
 fn memories_db_url(app: &tauri::AppHandle) -> Result<String, String> {
-    let mut app_config_dir = app
+    let mut app_data_dir = app
         .path()
-        .app_config_dir()
-        .map_err(|error| format!("failed to resolve app config directory: {error}"))?;
+        .app_data_dir()
+        .map_err(|error| format!("failed to resolve app data directory: {error}"))?;
 
-    std::fs::create_dir_all(&app_config_dir)
-        .map_err(|error| format!("failed to create app config directory: {error}"))?;
+    std::fs::create_dir_all(&app_data_dir)
+        .map_err(|error| format!("failed to create app data directory: {error}"))?;
 
-    app_config_dir.push("memories.db");
+    app_data_dir.push("memories.db");
 
-    Ok(format!("sqlite://{}", app_config_dir.to_string_lossy()))
+    Ok(format!("sqlite://{}", app_data_dir.to_string_lossy()))
 }
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
+    async fn setup_database(app: &tauri::AppHandle) -> Result<(), String> {
+        let mut app_data_dir = app
+            .path()
+            .app_data_dir()
+            .map_err(|error| format!("failed to resolve app data directory: {error}"))?;
+
+        std::fs::create_dir_all(&app_data_dir)
+            .map_err(|error| format!("failed to create app data directory: {error}"))?;
+
+        app_data_dir.push("memories.db");
+
+        let connect_options = SqliteConnectOptions::new()
+            .filename(&app_data_dir)
+            .create_if_missing(true);
+
+        let pool = sqlx::SqlitePool::connect_with(connect_options)
+            .await
+            .map_err(|error| format!("failed to connect to memories database for setup: {error}"))?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS MemoryItem (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                date TEXT NOT NULL,
+                location TEXT,
+                media_url TEXT NOT NULL,
+                overlay_url TEXT,
+                status TEXT NOT NULL,
+                retry_count INTEGER NOT NULL DEFAULT 0,
+                last_error_code TEXT,
+                last_error_message TEXT
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|error| format!("failed to create MemoryItem table: {error}"))?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS ExportJob (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                status TEXT NOT NULL,
+                total_files INTEGER NOT NULL DEFAULT 0,
+                downloaded_files INTEGER NOT NULL DEFAULT 0
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|error| format!("failed to create ExportJob table: {error}"))?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS Memories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hash TEXT NOT NULL UNIQUE,
+                date TEXT NOT NULL,
+                status TEXT NOT NULL
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|error| format!("failed to create Memories table: {error}"))?;
+
+        sqlx::query(
+            "CREATE TABLE IF NOT EXISTS MediaChunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                memory_id INTEGER NOT NULL,
+                url TEXT NOT NULL,
+                overlay_url TEXT,
+                order_index INTEGER NOT NULL,
+                FOREIGN KEY (memory_id) REFERENCES Memories(id)
+            )",
+        )
+        .execute(&pool)
+        .await
+        .map_err(|error| format!("failed to create MediaChunks table: {error}"))?;
+
+        pool.close().await;
+        Ok(())
+    }
+
+    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -99,6 +177,24 @@ async fn get_job_state(app: tauri::AppHandle) -> Result<ExportJobState, String> 
             downloaded_files: 0,
         })
     }
+}
+
+#[tauri::command]
+async fn get_queued_count(app: tauri::AppHandle) -> Result<i64, String> {
+    let database_url = memories_db_url(&app)?;
+    let pool = sqlx::SqlitePool::connect(&database_url)
+        .await
+        .map_err(|error| format!("failed to connect to memories database: {error}"))?;
+
+    let count = sqlx::query_scalar::<_, i64>(
+        "SELECT COUNT(*) FROM MemoryItem WHERE status IN ('queued', 'retryable')",
+    )
+    .fetch_one(&pool)
+    .await
+    .map_err(|error| format!("failed to count queued memory items: {error}"))?;
+
+    pool.close().await;
+    Ok(count)
 }
 
 #[tauri::command]
@@ -827,14 +923,15 @@ fn resolve_failed_memory_status(
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .plugin(
-            tauri_plugin_sql::Builder::default()
-                .add_migrations("sqlite:memories.db", db::sqlite_migrations())
-                .build(),
-        )
+        .setup(|app| {
+            tauri::async_runtime::block_on(setup_database(app.handle()))
+                .map_err(|error| -> Box<dyn std::error::Error> { error.into() })?;
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             greet,
             get_job_state,
+            get_queued_count,
             set_job_state,
             import_memories_json,
             validate_memory_file,

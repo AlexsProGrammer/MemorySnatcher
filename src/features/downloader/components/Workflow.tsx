@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import {
   downloadQueuedMemories,
   getJobState,
+  getQueuedCount,
   importMemoriesJson,
   onDownloadProgress,
   onProcessProgress,
@@ -77,8 +78,9 @@ function loadRateLimitSettings(): DownloadRateLimitSettings | undefined {
 }
 
 export function Workflow() {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<UploadableFile | null>(null);
-  const [hasFile, setHasFile] = useState(false);
+  const [hasImported, setHasImported] = useState(false);
   const [importState, setImportState] = useState<ImportState>("idle");
   const [workflowStage, setWorkflowStage] = useState<WorkflowStage>("download");
   const [jobState, setJobState] = useState<ExportJobState>({
@@ -95,14 +97,19 @@ export function Workflow() {
   useEffect(() => {
     const loadJobState = async () => {
       try {
-        const currentJobState = await getJobState();
+        const [currentJobState, queuedCount] = await Promise.all([
+          getJobState(),
+          getQueuedCount(),
+        ]);
         setJobState(currentJobState);
         setWorkflowStage(inferWorkflowStage(currentJobState));
+        if (queuedCount > 0) {
+          setHasImported(true);
+        }
       } catch (error) {
         setStatusMessage(`Could not load job state: ${normalizeError(error)}`);
       }
     };
-
     void loadJobState();
   }, []);
 
@@ -172,22 +179,12 @@ export function Workflow() {
 
   const isWorking = importState !== "idle";
 
-  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.item(0) ?? null;
-    setSelectedFile(file as UploadableFile | null);
-    const name = file?.name.toLowerCase() ?? "";
-    const valid = name.endsWith(".zip") || name.endsWith(".json");
-    setHasFile(file !== null && valid);
-    setStatusMessage(file ? `Selected file: ${file.name}` : "No file selected.");
-  };
+  const onUpload = async (fileToUpload: UploadableFile) => {
+    console.log(
+      `Starting upload for file: ${fileToUpload.name}, size: ${fileToUpload.size} bytes, path: ${fileToUpload.path ?? "N/A"}`,
+    );
 
-  const onUpload = async () => {
-    if (!selectedFile) {
-      setStatusMessage("Choose a .zip or .json file first.");
-      return;
-    }
-
-    const fileName = selectedFile.name.toLowerCase();
+    const fileName = fileToUpload.name.toLowerCase();
     const isJson = fileName.endsWith(".json");
     const isZip = fileName.endsWith(".zip");
 
@@ -198,33 +195,78 @@ export function Workflow() {
 
     try {
       setImportState("validating");
+      setStatusMessage(`Uploading ${fileToUpload.name}...`);
 
       if (isZip) {
-        if (!selectedFile.path || selectedFile.path.trim().length === 0) {
+        if (!fileToUpload.path || fileToUpload.path.trim().length === 0) {
           throw new Error("ZIP validation requires a local file path from the Tauri file picker.");
         }
 
-        const isValid = await validateMemoryFile(selectedFile.path);
+        const isValid = await validateMemoryFile(fileToUpload.path);
         if (!isValid) {
           throw new Error("ZIP is invalid or does not include memories_history.json.");
         }
       }
 
       setImportState("importing");
-      const jsonContent = await selectedFile.text();
+      const jsonContent = await fileToUpload.text();
       const summary = await importMemoriesJson(jsonContent);
 
       setStatusMessage(
         `Imported ${summary.importedCount} items. Skipped ${summary.skippedDuplicates} duplicates.`,
       );
+      console.log(`Import result: ${summary.importedCount} imported, ${summary.skippedDuplicates} duplicates skipped, ${summary.parsedCount} total parsed.`);
 
-      const currentJobState = await getJobState();
-      setJobState(currentJobState);
-      setWorkflowStage(inferWorkflowStage(currentJobState));
+      // Mark import as completed immediately after a successful import call.
+      // This guarantees the upload section collapses and download button unlocks,
+      // even if follow-up state refresh calls fail.
+      setHasImported(true);
+
+      try {
+        const [currentJobState, queuedCount] = await Promise.all([
+          getJobState(),
+          getQueuedCount(),
+        ]);
+        setJobState(currentJobState);
+        setWorkflowStage(inferWorkflowStage(currentJobState));
+        // Keep true once imported; never regress to false due to a transient query issue.
+        if (queuedCount > 0) {
+          setHasImported(true);
+        }
+      } catch (refreshError) {
+        console.error("Post-import state refresh failed:", refreshError);
+      }
+
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     } catch (error) {
+      console.error("Upload failed:", error);
       setStatusMessage(normalizeError(error));
     } finally {
       setImportState("idle");
+    }
+  };
+
+  const onFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.item(0) ?? null;
+    const uploadableFile = file as UploadableFile | null;
+    setSelectedFile(uploadableFile);
+
+    if (!uploadableFile) {
+      setStatusMessage("No file selected.");
+      return;
+    }
+
+    void onUpload(uploadableFile);
+  };
+
+  const onRemoveFile = () => {
+    setSelectedFile(null);
+    setStatusMessage("Upload a Snapchat export (.zip or .json) to begin.");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
     }
   };
 
@@ -257,23 +299,40 @@ export function Workflow() {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2 rounded-md border border-border p-3">
-        <p className="text-sm font-medium">Upload Snapchat Export</p>
-        <p className="text-xs text-muted-foreground">
-          Upload a .zip file (must contain memories_history.json) or a .json file.
-        </p>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+      {!hasImported && (
+        <div className="space-y-2 rounded-md border border-border p-3">
+          <p className="text-sm font-medium">Upload Snapchat Export</p>
+          <p className="text-xs text-muted-foreground">
+            Upload a .zip file (must contain memories_history.json) or a .json file.
+          </p>
           <input
+            ref={fileInputRef}
             type="file"
             accept=".zip,.json,application/json,application/zip"
             onChange={onFileChange}
-            className="block w-full text-sm"
+            className="hidden"
           />
-          <Button type="button" onClick={onUpload} disabled={!hasFile || isWorking}>
-            {importState === "idle" ? "Upload" : "Uploading..."}
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            {!selectedFile ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isWorking}
+              >
+                Upload
+              </Button>
+            ) : (
+              <>
+                <span className="flex-1 truncate text-sm">{selectedFile.name}</span>
+                <Button type="button" variant="outline" onClick={onRemoveFile} disabled={isWorking}>
+                  Remove
+                </Button>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="space-y-2">
         <p className="text-sm text-muted-foreground">
@@ -296,7 +355,11 @@ export function Workflow() {
 
       <div className="flex gap-2">
         {workflowStage === "download" ? (
-          <Button type="button" onClick={onStartDownload}>
+          <Button
+            type="button"
+            onClick={onStartDownload}
+            disabled={!hasImported}
+          >
             Start Download
           </Button>
         ) : (
