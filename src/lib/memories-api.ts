@@ -126,6 +126,10 @@ export async function getThumbnails(
   return invoke<ThumbnailItem[]>("get_thumbnails", { offset, limit });
 }
 
+export async function resetAllAppData(): Promise<void> {
+  return invoke<void>("reset_all_app_data");
+}
+
 export async function onDownloadProgress(
   callback: (payload: DownloadProgressPayload) => void,
 ): Promise<UnlistenFn> {

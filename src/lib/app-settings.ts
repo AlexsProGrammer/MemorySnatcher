@@ -1,6 +1,7 @@
 import { parseLanguagePreference, type LanguagePreference } from "@/lib/language";
 
 export const SETTINGS_STORAGE_KEY = "memorysnaper.rate-limit-settings";
+export const THEME_STORAGE_KEY = "memorysnaper-theme";
 
 export type ThemePreference = "light" | "dark" | "system";
 
@@ -96,4 +97,13 @@ export function writeAppSettings(settings: AppSettings): void {
   }
 
   window.localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+}
+
+export function clearPersistedAppClientState(): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.removeItem(SETTINGS_STORAGE_KEY);
+  window.localStorage.removeItem(THEME_STORAGE_KEY);
 }

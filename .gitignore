@@ -1,4 +1,5 @@
 demo_data/
+src-tauri/.raw_cache/
 
 # Logs
 logs

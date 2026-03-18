@@ -670,6 +670,76 @@ async fn get_thumbnails(
 }
 
 #[tauri::command]
+async fn reset_all_app_data(app: tauri::AppHandle) -> Result<(), String> {
+    let database_url = memories_db_url(&app)?;
+    let pool = sqlx::SqlitePool::connect(&database_url)
+        .await
+        .map_err(|error| format!("failed to connect to memories database: {error}"))?;
+
+    let mut transaction = pool
+        .begin()
+        .await
+        .map_err(|error| format!("failed to begin reset transaction: {error}"))?;
+
+    sqlx::query("DELETE FROM MediaChunks")
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to clear MediaChunks table: {error}"))?;
+
+    sqlx::query("DELETE FROM Memories")
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to clear Memories table: {error}"))?;
+
+    sqlx::query("DELETE FROM MemoryItem")
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to clear MemoryItem table: {error}"))?;
+
+    sqlx::query("DELETE FROM ExportJob")
+        .execute(&mut *transaction)
+        .await
+        .map_err(|error| format!("failed to clear ExportJob table: {error}"))?;
+
+    sqlx::query(
+        "DELETE FROM sqlite_sequence WHERE name IN ('MediaChunks', 'Memories', 'MemoryItem', 'ExportJob')",
+    )
+    .execute(&mut *transaction)
+    .await
+    .map_err(|error| format!("failed to reset autoincrement counters: {error}"))?;
+
+    transaction
+        .commit()
+        .await
+        .map_err(|error| format!("failed to commit reset transaction: {error}"))?;
+
+    pool.close().await;
+
+    let cache_paths = [
+        std::path::Path::new(".raw_cache"),
+        std::path::Path::new(".thumbnails"),
+    ];
+
+    for cache_path in cache_paths {
+        if !cache_path.exists() {
+            continue;
+        }
+
+        std::fs::remove_dir_all(cache_path).map_err(|error| {
+            format!(
+                "failed to clear cache directory '{}': {error}",
+                cache_path.display()
+            )
+        })?;
+    }
+
+    std::fs::create_dir_all(std::path::Path::new(".raw_cache"))
+        .map_err(|error| format!("failed to recreate .raw_cache directory: {error}"))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn process_downloaded_memories(
     app: tauri::AppHandle,
     window: tauri::Window,
@@ -964,7 +1034,8 @@ pub fn run() {
             resume_export_downloads,
             apply_metadata_to_output_files,
             process_downloaded_memories,
-            get_thumbnails
+            get_thumbnails,
+            reset_all_app_data
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

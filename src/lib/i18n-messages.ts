@@ -25,6 +25,13 @@ const enMessages = {
   "settings.form.concurrentDownloads": "Concurrent Downloads",
   "settings.form.warning":
     "Warning: Values above 100 RPM or 5 concurrent downloads may trigger throttling.",
+  "settings.form.reset.button": "Reset all app data",
+  "settings.form.reset.inProgress": "Resetting data...",
+  "settings.form.reset.description":
+    "Deletes all imported media records, processing state, and app-managed cache data.",
+  "settings.form.reset.confirm":
+    "This will permanently delete all app-managed media data and reset the local database. Continue?",
+  "settings.form.reset.error": "Reset failed. Please try again.",
 
   "downloader.card.title": "Downloader",
   "downloader.card.description": "Import Snapchat export data and download queued memories.",
@@ -115,6 +122,13 @@ const deMessages: Record<TranslationKey, string> = {
   "settings.form.concurrentDownloads": "Gleichzeitige Downloads",
   "settings.form.warning":
     "Warnung: Werte über 100 RPM oder 5 gleichzeitigen Downloads können Drosselung auslösen.",
+  "settings.form.reset.button": "Alle App-Daten zurücksetzen",
+  "settings.form.reset.inProgress": "Daten werden zurückgesetzt...",
+  "settings.form.reset.description":
+    "Löscht alle importierten Medieneinträge, Verarbeitungszustände und App-verwaltete Cache-Daten.",
+  "settings.form.reset.confirm":
+    "Dadurch werden alle App-verwalteten Mediendaten dauerhaft gelöscht und die lokale Datenbank zurückgesetzt. Fortfahren?",
+  "settings.form.reset.error": "Zurücksetzen fehlgeschlagen. Bitte erneut versuchen.",
 
   "downloader.card.title": "Downloader",
   "downloader.card.description":

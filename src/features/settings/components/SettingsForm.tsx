@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
+  clearPersistedAppClientState,
   parseThemePreference,
   readAppSettings,
   writeAppSettings,
@@ -9,6 +10,7 @@ import {
 } from "@/lib/app-settings";
 import { parseLanguagePreference, type LanguagePreference } from "@/lib/language";
 import { useI18n } from "@/lib/i18n";
+import { resetAllAppData } from "@/lib/memories-api";
 
 const REQUESTS_WARNING_THRESHOLD = 100;
 const CONCURRENCY_WARNING_THRESHOLD = 5;
@@ -39,6 +41,8 @@ export function SettingsForm() {
   const [requestsPerMinute, setRequestsPerMinute] = useState<number>(10);
   const [concurrentDownloads, setConcurrentDownloads] = useState<number>(3);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
+  const [isResettingAllData, setIsResettingAllData] = useState(false);
+  const [resetErrorMessage, setResetErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     const settings = readAppSettings();
@@ -83,6 +87,29 @@ export function SettingsForm() {
 
   const onLanguagePreferenceChange = (event: ChangeEvent<HTMLSelectElement>) => {
     setLanguagePreference(parseLanguagePreference(event.target.value));
+  };
+
+  const onResetAllData = async () => {
+    if (isResettingAllData) {
+      return;
+    }
+
+    const confirmed = window.confirm(t("settings.form.reset.confirm"));
+    if (!confirmed) {
+      return;
+    }
+
+    setResetErrorMessage(null);
+    setIsResettingAllData(true);
+
+    try {
+      await resetAllAppData();
+      clearPersistedAppClientState();
+      window.location.reload();
+    } catch {
+      setResetErrorMessage(t("settings.form.reset.error"));
+      setIsResettingAllData(false);
+    }
   };
 
   return (
@@ -170,6 +197,24 @@ export function SettingsForm() {
           {t("settings.form.warning")}
         </p>
       ) : null}
+
+      <div className="space-y-2 border-t border-border pt-4">
+        <Button
+          type="button"
+          variant="destructive"
+          className="w-full"
+          disabled={isResettingAllData}
+          onClick={() => {
+            void onResetAllData();
+          }}
+        >
+          {isResettingAllData
+            ? t("settings.form.reset.inProgress")
+            : t("settings.form.reset.button")}
+        </Button>
+        <p className="text-xs text-muted-foreground">{t("settings.form.reset.description")}</p>
+        {resetErrorMessage ? <p className="text-sm text-red-600">{resetErrorMessage}</p> : null}
+      </div>
     </form>
   );
 }
