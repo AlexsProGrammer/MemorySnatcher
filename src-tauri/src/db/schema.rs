@@ -68,5 +68,43 @@ pub fn sqlite_migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 6,
+            description: "create_export_jobs_table",
+            sql: "
+                CREATE TABLE IF NOT EXISTS ExportJobs (
+                    id TEXT PRIMARY KEY,
+                    created_at DATETIME,
+                    status TEXT
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 7,
+            description: "add_memories_job_and_output_fields",
+            sql: "
+                ALTER TABLE Memories ADD COLUMN job_id TEXT;
+                ALTER TABLE Memories ADD COLUMN mid TEXT;
+                ALTER TABLE Memories ADD COLUMN content_hash TEXT;
+                ALTER TABLE Memories ADD COLUMN relative_path TEXT;
+                ALTER TABLE Memories ADD COLUMN thumbnail_path TEXT;
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_memories_content_hash ON Memories(content_hash);
+            ",
+            kind: MigrationKind::Up,
+        },
+        Migration {
+            version: 8,
+            description: "create_processed_zips_table",
+            sql: "
+                CREATE TABLE IF NOT EXISTS ProcessedZips (
+                    job_id TEXT,
+                    filename TEXT,
+                    status TEXT,
+                    PRIMARY KEY (job_id, filename)
+                );
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }

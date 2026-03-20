@@ -1,4 +1,5 @@
 pub mod core;
+pub mod db;
 
 use serde::{Deserialize, Serialize};
 use sqlx::sqlite::SqliteConnectOptions;
@@ -1288,6 +1289,9 @@ pub fn run() {
             get_job_state,
             get_queued_count,
             set_job_state,
+            db::db_get_export_job_state,
+            db::db_get_pause_resume_flags,
+            db::db_get_zip_status,
             import_memories_json,
             validate_memory_file,
             validate_memory_json_content,

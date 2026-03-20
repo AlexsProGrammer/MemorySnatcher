@@ -1,7 +1,6 @@
 ---
 description: "Execute the next unchecked implementation step with verification and checklist updates."
 name: "Execute"
-agent: "Engineer"
 ---
 Read `IMPLEMENTATION.md`, find the first incomplete phase, and execute the first unchecked step.
 

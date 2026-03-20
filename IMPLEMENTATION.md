@@ -1,13 +1,10 @@
-# The Architect Evaluation & Blueprint
+This is a massive and exciting architectural pivot. Based on the new JSON structure you provided and the new local ZIP contents, we have a clear path. 
 
-I have analyzed your updated codebase. You have successfully implemented the Feature-Sliced Design. The separation of `src/features/` and the Rust backend into `src-tauri/src/core/` and `src-tauri/src/db/` is exactly what a Production-Grade architecture looks like.
+**The biggest architectural discovery here:** Snapchat has completely removed the `Overlay Link` from the JSON. Overlays are no longer explicitly defined in the data export file. Instead, they are implicitly tied together in the ZIP files using the `mid` (Media ID) from the URL.
 
-### Brutal Evaluation of Current State
-* 🟢 **The Good:** The Rust foundation is solid. Using `tokio` for async downloads and isolating the SQLite schema guarantees high performance without blocking the UI thread.
-* 🔴 **The Issue Makers (UI/UX):** Your current `App.tsx` layout is not fully responsive. On mobile, the tabs don't anchor correctly to the bottom, and the content doesn't stretch to fill the screen (`flex-grow` is missing). Furthermore, Shadcn components look broken when forced into dark mode without a proper Theme Provider.
-* 🛡️ **Security & Standards:** The Rust command boundaries (`#[tauri::command]`) are well-placed, but you need to ensure the `README.md` clearly explains the local-first security model so users trust the app.
+Because of this, your Rust backend must parse the `mid` out of the `Download Link` URL parameters, reconstruct the expected filename (`<timestamp>_<mid>-main` and `<timestamp>_<mid>-overlay`), and actively hunt for them inside the 2GB ZIP archives. If the ZIP search comes up empty, it falls back to a network download.
 
-Here is the precise `IMPLEMENTATION.md` to execute the UI/UX polish and documentation phase.
+Here is the comprehensive, strictly formatted `IMPLEMENTATION.md` blueprint to hand over to your Engineer Agent.
 
 ***
 
@@ -15,53 +12,66 @@ Here is the precise `IMPLEMENTATION.md` to execute the UI/UX polish and document
 # IMPLEMENTATION.md
 
 ## 1. Project Context & Architecture
-- **Goal:** Polish the application's UI/UX to industry standards. Implement a responsive layout (Tabs: Top on Desktop, Bottom on Mobile), integrate System-Default Light/Dark mode, enforce strict UI button states, and write comprehensive, trust-building English documentation.
+- **Goal:** Overhaul the Local Media Vault to process the modern Snapchat Export format. Implement Job-based session tracking, BLAKE3 content deduplication, dynamic ZIP content searching (using `mid`), minimal-footprint staging, pause/resume state machines, and structured `YYYY/MM` outputs.
 - **Tech Stack & Dependencies:**
-  - **Frontend:** React, Tailwind CSS, `lucide-react`.
-  - **Theme Management:** `npm install next-themes` (Standard for Shadcn/Tailwind dark mode).
-- **File Structure:**
+  - **Rust:** `cargo add uuid blake3 url chrono reqwest zip tokio`
+  - **Frontend:** React, Tailwind, Shadcn UI (`lucide-react` for icons).
+- **File Structure Updates:**
   ```text
-  ├── README.md               # To be completely rewritten
-  ├── src/
-  │   ├── components/
-  │   │   └── theme-provider.tsx # New theme context
-  │   ├── features/
-  │   │   └── downloader/components/Workflow.tsx # Button state logic
-  │   └── App.tsx             # Layout routing
+  ├── src-tauri/src/
+  │   ├── core/
+  │   │   ├── parser.rs      # JSON parsing and URL 'mid' extraction
+  │   │   ├── zip_hunter.rs  # NEW: Scans ZIPs for specific MIDs
+  │   │   ├── processor.rs   # FFmpeg, BLAKE3, and Staging
+  │   │   └── state.rs       # NEW: Pause/Resume Atomic Flags
+  │   └── db/schema.rs       # Job and Content Hash tables
   ```
-- **Attention Points:** Tailwind's `flex` and `h-screen` classes must be used carefully to ensure the middle content area scrolls while the tab bar remains fixed on mobile.
+- **Attention Points:** - Overlays are no longer in the JSON; they must be found locally via `mid` matching (`<date>_<mid>-overlay.png`).
+  - Strict Sliding Window extraction: Extract ONLY the files currently being processed into `.staging` to minimize disk space.
 
 ## 2. Execution Phases
 
-### Phase 1: Responsive Layout & Tab Positioning
-- [x] **Step 1.1:** In `src/App.tsx`, wrap the main application in a `div` with `flex h-screen w-full flex-col bg-background text-foreground`.
-- [x] **Step 1.2:** Update the Tab Bar component/container to use responsive positioning: `flex md:relative md:top-0 fixed bottom-0 w-full z-50 border-t md:border-b md:border-t-0 bg-background`.
-- [x] **Step 1.3:** Wrap the main content area (where features are rendered) in a `div` with `flex-1 overflow-y-auto pb-16 md:pb-0`. The `pb-16` prevents the bottom fixed tab bar on mobile from overlapping the bottom content.
-- [x] **Verification:** Run `npm run tauri dev`. Resize the window to mobile width. Verify the tabs snap to the bottom and the content area fills the remaining screen height.
+### Phase 1: Database Schema & Job State (SQLite)
+- [x] **Step 1.1:** In `src-tauri/src/db/schema.rs`, create the `ExportJobs` table: `id TEXT PRIMARY KEY, created_at DATETIME, status TEXT`.
+- [x] **Step 1.2:** Update the `Memories` table to include `job_id TEXT`, `mid TEXT`, `content_hash TEXT`, `relative_path TEXT`, `thumbnail_path TEXT`, and `status TEXT`. Add a `UNIQUE` constraint on `content_hash`.
+- [x] **Step 1.3:** Create a `ProcessedZips` table: `job_id TEXT, filename TEXT, status TEXT, PRIMARY KEY (job_id, filename)`.
+- [x] **Step 1.4:** In `src-tauri/src/db/mod.rs`, expose Tauri commands to read Job state, Pause/Resume flags, and ZIP status for the frontend.
+- [ ] **Verification:** Run `npm run tauri dev`, open the console, and execute the DB initialization. Verify using a local SQLite viewer that the `ExportJobs` and updated `Memories` tables exist.
 
-### Phase 2: System-Default Dark/Light Mode
-- [x] **Step 2.1:** Install theme dependency: run `npm install next-themes`.
-- [x] **Step 2.2:** Create `src/components/theme-provider.tsx` exporting a `ThemeProvider` component wrapping `next-themes` (standard Shadcn implementation).
-- [x] **Step 2.3:** In `src/main.tsx`, wrap `<App />` with `<ThemeProvider defaultTheme="system" storageKey="memorysnaper-theme">`.
-- [x] **Step 2.4:** Ensure `src/index.css` contains the `.dark` CSS variables required by Shadcn UI.
-- [x] **Verification:** Change your OS/System theme from Light to Dark. Verify the app's background and text colors switch automatically without a manual page reload.
+### Phase 2: JSON Parsing & MID Extraction
+- [ ] **Step 2.1:** In `src-tauri/src/core/parser.rs`, define the Serde structs to match the new JSON format (`Date`, `Media Type`, `Location`, `Download Link`, `Media Download Url`).
+- [ ] **Step 2.2:** Implement logic using the `url` crate to parse the `Download Link` and extract the `mid` query parameter (e.g., `9a5a9ce7...`).
+- [ ] **Step 2.3:** Parse the `Date` string using `chrono` to extract the `YYYY-MM-DD` component. Store the `mid` and parsed Date in the `Memories` table under the active `job_id`.
+- [ ] **Verification:** Create a mock JSON with 2 entries. Run a test Rust function to parse it. Verify the DB has 2 rows with the correctly extracted `mid` strings.
 
-### Phase 3: UI Polish & Strict Button States
-- [x] **Step 3.1:** In `src/features/downloader/components/Workflow.tsx` (or where your upload dropzone is), introduce a state `const [hasFile, setHasFile] = useState(false)`.
-- [x] **Step 3.2:** Update the file selection handler to set `hasFile` to `true` when a valid `.zip` or `.json` is selected.
-- [x] **Step 3.3:** Modify the "Start Export" (or Upload) `<Button>` to be `disabled={!hasFile}`. Shadcn UI will automatically apply the correct greyed-out styling when disabled.
-- [x] **Step 3.4:** Ensure all container cards (`<Card>`) have `w-full max-w-4xl mx-auto` to dynamically stretch and center on larger screens without breaking.
-- [ ] **Verification:** Open the Downloader tab. Verify the main action button is greyed out and unclickable. Drop a file into the zone and verify the button turns to the active primary color.
+### Phase 3: The "Zip Hunter" & Sliding Window Staging
+- [ ] **Step 3.1:** In `src-tauri/src/core/zip_hunter.rs`, implement `find_and_extract_memory(zip_paths, date, mid)`. It must use the `zip` crate to iterate through the provided ZIPs without extracting them entirely.
+- [ ] **Step 3.2:** Inside the loop, check if filenames contain `<date>_<mid>-main` or `<date>_<mid>-overlay`.
+- [ ] **Step 3.3:** If found, extract ONLY those specific files to `.staging/`. 
+- [ ] **Step 3.4:** If the `main` file is NOT found in any ZIP, fallback to `reqwest` to download it via the `Media Download Url` into `.staging/`. If the download fails, update DB status to `FAILED_NETWORK`.
+- [ ] **Verification:** Place a mock ZIP containing `2026-02-20_9a5a...-main.mp4` in the directory. Run the hunter function with the corresponding `mid`. Verify ONLY that file appears in `.staging/`.
 
-### Phase 4: High-Standard English Documentation
-- [x] **Step 4.1:** Rewrite `README.md`. Include a professional Header/Logo placeholder.
-- [x] **Step 4.2:** Add a "Features" section highlighting: 100% Local Processing, Multi-Part Video Stitching, Overlay Burn-in, and Privacy-First architecture.
-- [x] **Step 4.3:** Add a "Getting Started" section with prerequisites (Node, Rust) and build instructions (`npm install`, `npm run tauri dev`).
-- [x] **Step 4.4:** Add an "Architecture" section explaining the Rust + React + SQLite sidecar paradigm so open-source contributors understand the data flow.
-- [ ] **Verification:** Open `README.md` in VS Code's Markdown preview. Verify it looks like a top-tier open-source tool with clear headings and no grammatical errors.
+### Phase 4: BLAKE3 Deduplication & FFmpeg Processing
+- [ ] **Step 4.1:** In `src-tauri/src/core/processor.rs`, before running FFmpeg, read the staged `main` file into a `blake3::Hasher`. 
+- [ ] **Step 4.2:** Query the DB for `content_hash`. If a match exists, mark memory as `DUPLICATE`, delete from `.staging/`, and skip.
+- [ ] **Step 4.3:** If unique, check if an `overlay` exists in `.staging/`. If yes, run the FFmpeg burn-in command. If no, just copy the file.
+- [ ] **Step 4.4:** Format the final output path using `chrono`: `Export_Folder/YYYY/MM_MonthName/`. Generate a 300x300 thumbnail into `Export_Folder/.thumbnails/`.
+- [ ] **Step 4.5:** Update DB with `status = PROCESSED`, `relative_path`, and `thumbnail_path`. Clean the `.staging/` folder.
+- [ ] **Verification:** Stage an image and a transparent PNG overlay. Run the processor. Verify a merged image appears in `2026/02_February/` and a thumbnail in `.thumbnails/`.
+
+### Phase 5: State Machine Control (Pause/Stop)
+- [ ] **Step 5.1:** In `src-tauri/src/core/state.rs`, utilize `std::sync::atomic::AtomicBool` or `tokio::sync::watch` to represent `is_paused` and `is_stopped`.
+- [ ] **Step 5.2:** Wrap the main processing loop in `src-tauri/src/core/processor.rs` with checks for these flags. If `is_paused`, await a signal. If `is_stopped`, gracefully break the loop, leaving unfinished items as `PENDING` in the DB.
+- [ ] **Verification:** Trigger the processing loop. Call the "Pause" Tauri command from the React frontend. Verify console logs show the loop pausing without crashing.
+
+### Phase 6: Frontend Progress & Viewer UI
+- [ ] **Step 6.1:** In `src/features/downloader/components/Workflow.tsx`, add UI to select 1 JSON and multiple ZIPs. 
+- [ ] **Step 6.2:** Create a Live Console component that listens to Tauri events. Display strings like `[2026-02-20] Extracting mid 9a5a... from ZIP 3`.
+- [ ] **Step 6.3:** Show global progress: `Files Processed: X / Y`, `Duplicates Skipped: Z`, `Active ZIP: part_3.zip`. Add Pause and Stop buttons bound to the Tauri state commands.
+- [ ] **Verification:** Start a mock process. Verify the UI updates in real-time with the current date, file counts, and the pause button halts UI progress.
 
 ## 3. Global Testing Strategy
-1. **The Device Emulation Test:** Open the Vite frontend in a standard browser (e.g., Chrome at `localhost:1420`). Use Chrome DevTools Device Toolbar to toggle between an iPhone 14 Pro and a Desktop 1080p display. The layout MUST immediately shift the navigation bar from top to bottom.
-2. **The Theme Persistence Test:** Manually set the theme to Dark using the UI (if a toggle is added), close the app entirely, and reopen it. Verify it does not flash white before turning dark.
-3. **The Empty State Test:** Restart the app, navigate to the Downloader, and attempt to aggressively click the greyed-out Upload/Start button. Ensure no backend Rust calls are triggered.
+1. **The Missing File Fallback Test:** Provide a JSON with a `mid`, but DO NOT put the file in the provided ZIPs. Verify the app recognizes it is missing, falls back to the HTTP `reqwest` download, successfully stages it, processes it, and marks it `PROCESSED`.
+2. **The 6-Month Drunk Duplicate Test:** Upload a JSON containing a `mid` that maps to a video already existing in the `Memories` DB (simulating a duplicate save). Verify the `blake3` hash catches it instantly, flags it as `DUPLICATE`, and the final folder does not contain a duplicate file.
+3. **The Pause & Force Quit Test:** Start a large batch. Click "Pause". Verify CPU usage drops to 0. Force quit the app. Reopen. Verify the app detects the unfinished job in SQLite and safely resumes exactly at the uncompleted file.
 ```
