@@ -39,9 +39,9 @@ Here is the comprehensive, strictly formatted `IMPLEMENTATION.md` blueprint to h
 - [ ] **Verification:** Run `npm run tauri dev`, open the console, and execute the DB initialization. Verify using a local SQLite viewer that the `ExportJobs` and updated `Memories` tables exist.
 
 ### Phase 2: JSON Parsing & MID Extraction
-- [ ] **Step 2.1:** In `src-tauri/src/core/parser.rs`, define the Serde structs to match the new JSON format (`Date`, `Media Type`, `Location`, `Download Link`, `Media Download Url`).
-- [ ] **Step 2.2:** Implement logic using the `url` crate to parse the `Download Link` and extract the `mid` query parameter (e.g., `9a5a9ce7...`).
-- [ ] **Step 2.3:** Parse the `Date` string using `chrono` to extract the `YYYY-MM-DD` component. Store the `mid` and parsed Date in the `Memories` table under the active `job_id`.
+- [x] **Step 2.1:** In `src-tauri/src/core/parser.rs`, define the Serde structs to match the new JSON format (`Date`, `Media Type`, `Location`, `Download Link`, `Media Download Url`).
+- [x] **Step 2.2:** Implement logic using the `url` crate to parse the `Download Link` and extract the `mid` query parameter (e.g., `9a5a9ce7...`).
+- [x] **Step 2.3:** Parse the `Date` string using `chrono` to extract the `YYYY-MM-DD` component. Store the `mid` and parsed Date in the `Memories` table under the active `job_id`.
 - [ ] **Verification:** Create a mock JSON with 2 entries. Run a test Rust function to parse it. Verify the DB has 2 rows with the correctly extracted `mid` strings.
 
 ### Phase 3: The "Zip Hunter" & Sliding Window Staging

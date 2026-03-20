@@ -3,10 +3,107 @@ use std::io::Write;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use chrono::{DateTime, NaiveDate, NaiveDateTime};
 use sha2::{Digest, Sha256};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::SqlitePool;
+
+/// Typed representation of a single entry in the modern Snapchat JSON export.
+///
+/// Field names use `#[serde(rename = ...)]` to match the exact keys Snapchat
+/// produces (e.g. `"Date"`, `"Media Type"`, `"Download Link"`,
+/// `"Media Download Url"`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SnapchatMemoryEntry {
+    #[serde(rename = "Date", default)]
+    pub date: String,
+
+    #[serde(rename = "Media Type", default)]
+    pub media_type: String,
+
+    #[serde(rename = "Location", default)]
+    pub location: String,
+
+    /// The token-based Snapchat CDN URL.  The `mid` query parameter is
+    /// extracted from this URL in Step 2.2.
+    #[serde(rename = "Download Link", default)]
+    pub download_link: String,
+
+    /// Direct fallback download URL used when the file cannot be found in
+    /// any local ZIP archive.
+    #[serde(rename = "Media Download Url", default)]
+    pub media_download_url: String,
+}
+
+/// Top-level wrapper for the modern Snapchat memories export JSON.
+///
+/// Snapchat wraps memory arrays under various container keys
+/// (e.g. `"Saved Media"`, `"Memories"`) that may vary across export
+/// versions.  This struct captures the most common layout; the dynamic
+/// `collect_memory_items` path remains as a fallback for other layouts.
+#[derive(Debug, Clone, Deserialize)]
+pub struct SnapchatMemoriesExport {
+    #[serde(rename = "Saved Media", default)]
+    pub saved_media: Vec<SnapchatMemoryEntry>,
+
+    #[serde(rename = "Memories", default)]
+    pub memories: Vec<SnapchatMemoryEntry>,
+}
+
+/// Extract the `mid` query parameter from a Snapchat CDN `Download Link` URL.
+///
+/// Snapchat's export embeds an opaque media-ID (e.g. `9a5a9ce7...`) as the
+/// `mid` query parameter of the token-authenticated CDN URL.  This ID is then
+/// used to locate the corresponding files inside the local ZIP archives.
+///
+/// Returns `Some(mid)` when parsing succeeds and the parameter is present,
+/// `None` otherwise.
+///
+/// # Example
+/// ```
+/// let mid = extract_mid_from_download_link(
+///     "https://fetchmedia.snapchat.com/...?mid=9a5a9ce7abc&token=...",
+/// );
+/// assert_eq!(mid, Some("9a5a9ce7abc".to_owned()));
+/// ```
+pub fn extract_mid_from_download_link(download_link: &str) -> Option<String> {
+    let parsed = url::Url::parse(download_link).ok()?;
+    parsed
+        .query_pairs()
+        .find(|(k, _)| k == "mid")
+        .map(|(_, v)| v.into_owned())
+}
+
+#[cfg(test)]
+mod mid_tests {
+    use super::extract_mid_from_download_link;
+
+    #[test]
+    fn extracts_mid_from_valid_url() {
+        let url = "https://fetchmedia.snapchat.com/v2/snap?mid=9a5a9ce7abcdef&token=tok123&cof=1";
+        assert_eq!(
+            extract_mid_from_download_link(url),
+            Some("9a5a9ce7abcdef".to_owned())
+        );
+    }
+
+    #[test]
+    fn returns_none_for_missing_mid() {
+        let url = "https://fetchmedia.snapchat.com/v2/snap?token=tok123";
+        assert_eq!(extract_mid_from_download_link(url), None);
+    }
+
+    #[test]
+    fn returns_none_for_invalid_url() {
+        assert_eq!(extract_mid_from_download_link("not-a-url"), None);
+    }
+
+    #[test]
+    fn returns_none_for_empty_string() {
+        assert_eq!(extract_mid_from_download_link(""), None);
+    }
+}
 
 #[derive(Debug)]
 pub enum ParserError {
@@ -200,6 +297,7 @@ pub async fn import_memories_history_json(
     let mut imported_count = 0usize;
     let mut skipped_duplicates = 0usize;
     let mut next_chunk_order_by_hash = std::collections::HashMap::<String, i64>::new();
+    let active_job_id = get_active_job_id(&mut transaction).await?;
 
     for item in &parsed_items {
         let exists = sqlx::query_scalar::<_, i64>(
@@ -230,17 +328,25 @@ pub async fn import_memories_history_json(
 
         imported_count += 1;
 
-        let memory_hash = build_memory_hash(&item.date, &item.media_type);
+        let parsed_date = normalize_date_component(&item.date);
+        let mid = extract_mid_from_download_link(&item.media_url);
+        let memory_hash = build_memory_hash(&parsed_date, &item.media_type);
 
         sqlx::query(
             "
-            INSERT OR IGNORE INTO Memories (hash, date, status)
-            VALUES (?1, ?2, ?3)
+            INSERT INTO Memories (hash, date, status, job_id, mid)
+            VALUES (?1, ?2, ?3, ?4, ?5)
+            ON CONFLICT(hash) DO UPDATE SET
+                date = excluded.date,
+                job_id = COALESCE(excluded.job_id, Memories.job_id),
+                mid = COALESCE(excluded.mid, Memories.mid)
             ",
         )
         .bind(&memory_hash)
-        .bind(&item.date)
+        .bind(&parsed_date)
         .bind("queued")
+        .bind(active_job_id.as_deref())
+        .bind(mid.as_deref())
         .execute(&mut *transaction)
         .await?;
 
@@ -484,6 +590,70 @@ fn build_memory_hash(date: &str, media_type: &str) -> String {
     format!("{:x}", hasher.finalize())
 }
 
+fn normalize_date_component(raw_date: &str) -> String {
+    let trimmed = raw_date.trim();
+    if trimmed.is_empty() {
+        return "unknown".to_string();
+    }
+
+    if let Ok(parsed) = DateTime::parse_from_rfc3339(trimmed) {
+        return parsed.date_naive().format("%Y-%m-%d").to_string();
+    }
+
+    const DATE_TIME_FORMATS: [&str; 6] = [
+        "%Y-%m-%d %H:%M:%S",
+        "%Y-%m-%d %H:%M:%S%.f",
+        "%Y-%m-%dT%H:%M:%S",
+        "%Y-%m-%dT%H:%M:%S%.f",
+        "%Y-%m-%d %H:%M",
+        "%Y-%m-%dT%H:%M",
+    ];
+
+    for format in DATE_TIME_FORMATS {
+        if let Ok(parsed) = NaiveDateTime::parse_from_str(trimmed, format) {
+            return parsed.date().format("%Y-%m-%d").to_string();
+        }
+    }
+
+    if let Ok(parsed) = NaiveDate::parse_from_str(trimmed, "%Y-%m-%d") {
+        return parsed.format("%Y-%m-%d").to_string();
+    }
+
+    if trimmed.len() >= 10 {
+        let prefix = &trimmed[..10];
+        if let Ok(parsed) = NaiveDate::parse_from_str(prefix, "%Y-%m-%d") {
+            return parsed.format("%Y-%m-%d").to_string();
+        }
+    }
+
+    trimmed.to_string()
+}
+
+async fn get_active_job_id(
+    transaction: &mut sqlx::Transaction<'_, sqlx::Sqlite>,
+) -> Result<Option<String>, ParserError> {
+    let query_result = sqlx::query_scalar::<_, String>(
+        "
+        SELECT id
+        FROM ExportJobs
+        ORDER BY datetime(created_at) DESC, rowid DESC
+        LIMIT 1
+        ",
+    )
+    .fetch_optional(&mut **transaction)
+    .await;
+
+    match query_result {
+        Ok(job_id) => Ok(job_id),
+        Err(sqlx::Error::Database(database_error))
+            if database_error.message().contains("no such table: ExportJobs") =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(ParserError::Database(error)),
+    }
+}
+
 fn first_non_empty_string(value: &Value, keys: &[&str]) -> Option<String> {
     for key in keys {
         if let Some(value) = value.get(key).and_then(Value::as_str) {
@@ -514,8 +684,9 @@ fn parse_location(value: &Value) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        collect_memory_items, import_memories_history_file, import_memories_history_json,
-        validate_snapchat_export_schema, ParserError,
+        collect_memory_items, extract_mid_from_download_link, import_memories_history_file,
+        import_memories_history_json, normalize_date_component, validate_snapchat_export_schema,
+        ParserError,
     };
     use sqlx::Row;
 
@@ -777,6 +948,82 @@ mod tests {
         verification_pool.close().await;
     }
 
+    #[test]
+    fn normalizes_date_to_yyyy_mm_dd() {
+        assert_eq!(normalize_date_component("2024-03-01T23:15:59Z"), "2024-03-01");
+        assert_eq!(normalize_date_component("2024-03-01 23:15:59"), "2024-03-01");
+        assert_eq!(normalize_date_component("2024-03-01"), "2024-03-01");
+    }
+
+    #[tokio::test]
+    async fn stores_mid_and_parsed_date_under_active_job_id() {
+        let temp_dir = tempfile::tempdir().expect("temp dir should be created for parser tests");
+        let db_path = temp_dir.path().join("memories.db");
+        let db_url = format!("sqlite://{}?mode=rwc", db_path.to_string_lossy());
+
+        let pool = sqlx::SqlitePool::connect(&db_url)
+            .await
+            .expect("sqlite pool should be created for parser tests");
+        create_import_tables(&pool).await;
+
+        sqlx::query(
+            "
+            INSERT INTO ExportJobs (id, created_at, status)
+            VALUES (?1, ?2, ?3)
+            ",
+        )
+        .bind("job-active-1")
+        .bind("2026-03-20T12:00:00Z")
+        .bind("RUNNING")
+        .execute(&pool)
+        .await
+        .expect("export job should be inserted");
+
+        pool.close().await;
+
+        let test_mid = "9a5a9ce7abcdef";
+        let summary = import_memories_history_json(
+            &db_url,
+            &serde_json::json!({
+                "Saved Media": [
+                    {
+                        "Download Link": format!("https://fetchmedia.snapchat.com/v2/snap?mid={test_mid}&token=abc123"),
+                        "Date": "2026-02-20T10:22:03Z"
+                    }
+                ]
+            })
+            .to_string(),
+        )
+        .await
+        .expect("import should succeed");
+
+        assert_eq!(summary.imported_count, 1);
+
+        let verification_pool = sqlx::SqlitePool::connect(&db_url)
+            .await
+            .expect("sqlite pool should be opened for verification");
+
+        let row = sqlx::query("SELECT date, job_id, mid FROM Memories LIMIT 1")
+            .fetch_one(&verification_pool)
+            .await
+            .expect("memories row should exist");
+
+        let stored_date: String = row.get("date");
+        let stored_job_id: Option<String> = row.get("job_id");
+        let stored_mid: Option<String> = row.get("mid");
+
+        assert_eq!(stored_date, "2026-02-20");
+        assert_eq!(stored_job_id.as_deref(), Some("job-active-1"));
+        assert_eq!(stored_mid.as_deref(), Some(test_mid));
+
+        let extracted_mid = extract_mid_from_download_link(
+            "https://fetchmedia.snapchat.com/v2/snap?mid=9a5a9ce7abcdef&token=tok123",
+        );
+        assert_eq!(extracted_mid.as_deref(), Some(test_mid));
+
+        verification_pool.close().await;
+    }
+
     async fn create_import_tables(pool: &sqlx::SqlitePool) {
         sqlx::query(
             "
@@ -800,13 +1047,31 @@ mod tests {
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 hash TEXT NOT NULL UNIQUE,
                 date TEXT NOT NULL,
-                status TEXT NOT NULL
+                status TEXT NOT NULL,
+                job_id TEXT,
+                mid TEXT,
+                content_hash TEXT,
+                relative_path TEXT,
+                thumbnail_path TEXT
             )
             ",
         )
         .execute(pool)
         .await
         .expect("memories table should be created for parser tests");
+
+        sqlx::query(
+            "
+            CREATE TABLE IF NOT EXISTS ExportJobs (
+                id TEXT PRIMARY KEY,
+                created_at DATETIME,
+                status TEXT
+            )
+            ",
+        )
+        .execute(pool)
+        .await
+        .expect("export jobs table should be created for parser tests");
 
         sqlx::query(
             "
