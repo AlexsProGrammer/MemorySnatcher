@@ -32,6 +32,15 @@ struct ProcessMemoriesResult {
     failed_count: usize,
 }
 
+#[derive(Debug, Clone)]
+struct ProcessUnit {
+    memory_group_id: Option<i64>,
+    progress_item_id: i64,
+    memory_item_ids: Vec<i64>,
+    date_taken: String,
+    location: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ProcessProgressPayload {
@@ -821,15 +830,6 @@ async fn process_downloaded_memories(
     output_dir: String,
     keep_originals: bool,
 ) -> Result<ProcessMemoriesResult, String> {
-    #[derive(Debug)]
-    struct ProcessUnit {
-        memory_group_id: Option<i64>,
-        progress_item_id: i64,
-        memory_item_ids: Vec<i64>,
-        date_taken: String,
-        location: Option<String>,
-    }
-
     let resolved_output_dir = resolve_output_dir(&app, &output_dir)?;
 
     eprintln!(
@@ -935,7 +935,15 @@ async fn process_downloaded_memories(
         resolved_output_dir.display()
     );
 
-    for (index, unit) in process_units.into_iter().enumerate() {
+    for (index, unit) in process_units.iter().enumerate() {
+        if wait_for_pause_or_stop_and_mark_pending(&pool, &process_units[index..]).await? {
+            eprintln!(
+                "[processor-debug] stop requested; leaving remaining units pending (remaining={})",
+                process_units.len().saturating_sub(index)
+            );
+            break;
+        }
+
         let mut raw_media_paths = Vec::with_capacity(unit.memory_item_ids.len());
         let mut missing_file_for_item: Option<i64> = None;
 
@@ -1274,6 +1282,69 @@ async fn process_downloaded_memories(
     })
 }
 
+async fn wait_for_pause_or_stop_and_mark_pending(
+    pool: &sqlx::SqlitePool,
+    remaining_units: &[ProcessUnit],
+) -> Result<bool, String> {
+    loop {
+        let state = core::state::snapshot();
+
+        if state.is_stopped {
+            mark_remaining_units_pending(pool, remaining_units).await?;
+            return Ok(true);
+        }
+
+        if !state.is_paused {
+            return Ok(false);
+        }
+
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+}
+
+async fn mark_remaining_units_pending(
+    pool: &sqlx::SqlitePool,
+    remaining_units: &[ProcessUnit],
+) -> Result<(), String> {
+    for unit in remaining_units {
+        for memory_item_id in &unit.memory_item_ids {
+            sqlx::query(
+                "
+                UPDATE MemoryItem
+                SET status = 'PENDING',
+                    last_error_code = NULL,
+                    last_error_message = NULL
+                WHERE id = ?1
+                ",
+            )
+            .bind(memory_item_id)
+            .execute(pool)
+            .await
+            .map_err(|error| {
+                format!(
+                    "failed to mark memory item {} as pending: {error}",
+                    memory_item_id
+                )
+            })?;
+        }
+
+        if let Some(memory_group_id) = unit.memory_group_id {
+            sqlx::query("UPDATE Memories SET status = 'PENDING' WHERE id = ?1")
+                .bind(memory_group_id)
+                .execute(pool)
+                .await
+                .map_err(|error| {
+                    format!(
+                        "failed to mark memory group {} as pending: {error}",
+                        memory_group_id
+                    )
+                })?;
+        }
+    }
+
+    Ok(())
+}
+
 fn find_output_file_for_memory_item(
     output_dir: &std::path::Path,
     memory_item_id: i64,
@@ -1406,7 +1477,10 @@ pub fn run() {
 mod tests {
     use std::path::Path;
 
-    use super::{path_to_relative_string, resolve_failed_memory_status};
+    use super::{
+        mark_remaining_units_pending, path_to_relative_string, resolve_failed_memory_status,
+        wait_for_pause_or_stop_and_mark_pending, ProcessUnit,
+    };
     use crate::core::downloader::DownloadErrorCode;
 
     #[test]
@@ -1463,5 +1537,154 @@ mod tests {
         let error = path_to_relative_string(path, root).unwrap_err();
 
         assert!(error.contains("is not under root"));
+    }
+
+    #[tokio::test]
+    async fn marks_remaining_units_as_pending_when_stop_is_requested() {
+        crate::core::state::reset();
+
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("in-memory sqlite should open");
+
+        sqlx::query(
+            "
+            CREATE TABLE MemoryItem (
+                id INTEGER PRIMARY KEY,
+                status TEXT,
+                last_error_code TEXT,
+                last_error_message TEXT
+            )
+            ",
+        )
+        .execute(&pool)
+        .await
+        .expect("MemoryItem table should be created");
+
+        sqlx::query(
+            "
+            CREATE TABLE Memories (
+                id INTEGER PRIMARY KEY,
+                status TEXT
+            )
+            ",
+        )
+        .execute(&pool)
+        .await
+        .expect("Memories table should be created");
+
+        sqlx::query("INSERT INTO MemoryItem (id, status) VALUES (1, 'processed')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO MemoryItem (id, status) VALUES (2, 'downloaded')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO Memories (id, status) VALUES (100, 'processed')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let units = vec![ProcessUnit {
+            memory_group_id: Some(100),
+            progress_item_id: 2,
+            memory_item_ids: vec![2],
+            date_taken: "2026-02-20".to_string(),
+            location: None,
+        }];
+
+        crate::core::state::set_stopped(true);
+        let should_stop = wait_for_pause_or_stop_and_mark_pending(&pool, &units)
+            .await
+            .expect("stop handling should succeed");
+
+        assert!(should_stop);
+
+        let item_status: String = sqlx::query_scalar("SELECT status FROM MemoryItem WHERE id = 2")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+        let group_status: String = sqlx::query_scalar("SELECT status FROM Memories WHERE id = 100")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(item_status, "PENDING");
+        assert_eq!(group_status, "PENDING");
+
+        crate::core::state::reset();
+    }
+
+    #[tokio::test]
+    async fn mark_remaining_units_pending_updates_all_related_rows() {
+        let pool = sqlx::SqlitePool::connect("sqlite::memory:")
+            .await
+            .expect("in-memory sqlite should open");
+
+        sqlx::query(
+            "
+            CREATE TABLE MemoryItem (
+                id INTEGER PRIMARY KEY,
+                status TEXT,
+                last_error_code TEXT,
+                last_error_message TEXT
+            )
+            ",
+        )
+        .execute(&pool)
+        .await
+        .expect("MemoryItem table should be created");
+
+        sqlx::query(
+            "
+            CREATE TABLE Memories (
+                id INTEGER PRIMARY KEY,
+                status TEXT
+            )
+            ",
+        )
+        .execute(&pool)
+        .await
+        .expect("Memories table should be created");
+
+        sqlx::query("INSERT INTO MemoryItem (id, status) VALUES (5, 'processing_failed')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO MemoryItem (id, status) VALUES (6, 'downloaded')")
+            .execute(&pool)
+            .await
+            .unwrap();
+        sqlx::query("INSERT INTO Memories (id, status) VALUES (200, 'processing_failed')")
+            .execute(&pool)
+            .await
+            .unwrap();
+
+        let units = vec![ProcessUnit {
+            memory_group_id: Some(200),
+            progress_item_id: 5,
+            memory_item_ids: vec![5, 6],
+            date_taken: "2026-02-20".to_string(),
+            location: None,
+        }];
+
+        mark_remaining_units_pending(&pool, &units)
+            .await
+            .expect("pending update should succeed");
+
+        let statuses: Vec<String> = sqlx::query_scalar(
+            "SELECT status FROM MemoryItem WHERE id IN (5, 6) ORDER BY id ASC",
+        )
+        .fetch_all(&pool)
+        .await
+        .unwrap();
+        let group_status: String = sqlx::query_scalar("SELECT status FROM Memories WHERE id = 200")
+            .fetch_one(&pool)
+            .await
+            .unwrap();
+
+        assert_eq!(statuses, vec!["PENDING".to_string(), "PENDING".to_string()]);
+        assert_eq!(group_status, "PENDING");
     }
 }

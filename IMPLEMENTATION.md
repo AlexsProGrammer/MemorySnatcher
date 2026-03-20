@@ -60,8 +60,8 @@ Here is the comprehensive, strictly formatted `IMPLEMENTATION.md` blueprint to h
 - [ ] **Verification:** Stage an image and a transparent PNG overlay. Run the processor. Verify a merged image appears in `2026/02_February/` and a thumbnail in `.thumbnails/`.
 
 ### Phase 5: State Machine Control (Pause/Stop)
-- [ ] **Step 5.1:** In `src-tauri/src/core/state.rs`, utilize `std::sync::atomic::AtomicBool` or `tokio::sync::watch` to represent `is_paused` and `is_stopped`.
-- [ ] **Step 5.2:** Wrap the main processing loop in `src-tauri/src/core/processor.rs` with checks for these flags. If `is_paused`, await a signal. If `is_stopped`, gracefully break the loop, leaving unfinished items as `PENDING` in the DB.
+- [x] **Step 5.1:** In `src-tauri/src/core/state.rs`, utilize `std::sync::atomic::AtomicBool` or `tokio::sync::watch` to represent `is_paused` and `is_stopped`.
+- [x] **Step 5.2:** Wrap the main processing loop in `src-tauri/src/core/processor.rs` with checks for these flags. If `is_paused`, await a signal. If `is_stopped`, gracefully break the loop, leaving unfinished items as `PENDING` in the DB.
 - [ ] **Verification:** Trigger the processing loop. Call the "Pause" Tauri command from the React frontend. Verify console logs show the loop pausing without crashing.
 
 ### Phase 6: Frontend Progress & Viewer UI

@@ -1,8 +1,8 @@
-use std::sync::{LazyLock, RwLock};
-
 use serde::Serialize;
 use sqlx::Row;
 use tauri::Manager;
+
+use crate::core;
 
 pub mod schema;
 
@@ -30,13 +30,6 @@ pub struct ProcessedZipStatusRecord {
 	pub filename: String,
 	pub status: Option<String>,
 }
-
-static PAUSE_RESUME_FLAGS: LazyLock<RwLock<PauseResumeFlags>> = LazyLock::new(|| {
-	RwLock::new(PauseResumeFlags {
-		is_paused: false,
-		is_stopped: false,
-	})
-});
 
 fn memories_db_url(app: &tauri::AppHandle) -> Result<String, String> {
 	let mut app_data_dir = app
@@ -79,11 +72,12 @@ pub async fn db_get_export_job_state(
 
 #[tauri::command]
 pub fn db_get_pause_resume_flags() -> Result<PauseResumeFlags, String> {
-	let flags = PAUSE_RESUME_FLAGS
-		.read()
-		.map_err(|error| format!("failed to read pause/resume flags: {error}"))?;
+	let state = core::state::snapshot();
 
-	Ok(flags.clone())
+	Ok(PauseResumeFlags {
+		is_paused: state.is_paused,
+		is_stopped: state.is_stopped,
+	})
 }
 
 #[tauri::command]
