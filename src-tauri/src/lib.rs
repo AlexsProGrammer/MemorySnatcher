@@ -1576,6 +1576,7 @@ async fn process_downloaded_memories(
     window: tauri::Window,
     output_dir: String,
     keep_originals: bool,
+    thumbnail_quality: Option<String>,
 ) -> Result<ProcessMemoriesResult, String> {
     let resolved_output_dir = resolve_output_dir(&app, &output_dir)?;
 
@@ -1595,6 +1596,10 @@ async fn process_downloaded_memories(
     )?;
 
     let database_url = memories_db_url(&app)?;
+    let thumbnail_max_dimension = core::processor::ThumbnailQuality::from_setting(
+        thumbnail_quality.as_deref(),
+    )
+    .max_dimension();
     let pool = sqlx::SqlitePool::connect(&database_url)
         .await
         .map_err(|error| format!("failed to connect to memories database: {error}"))?;
@@ -1833,6 +1838,7 @@ async fn process_downloaded_memories(
             location: unit.location.clone(),
             export_dir: output_path.to_path_buf(),
             thumbnail_dir: thumbnail_path.clone(),
+            thumbnail_max_dimension,
             keep_originals,
             database_url: database_url.clone(),
         })
@@ -2066,6 +2072,7 @@ async fn process_memories_from_zip_archives(
     zip_paths: Vec<String>,
     output_dir: String,
     keep_originals: bool,
+    thumbnail_quality: Option<String>,
 ) -> Result<ProcessMemoriesResult, String> {
     if zip_paths.is_empty() {
         return Err("zip_paths must not be empty".to_string());
@@ -2073,6 +2080,10 @@ async fn process_memories_from_zip_archives(
 
     let resolved_output_dir = resolve_output_dir(&app, &output_dir)?;
     let database_url = memories_db_url(&app)?;
+    let thumbnail_max_dimension = crate::core::processor::ThumbnailQuality::from_setting(
+        thumbnail_quality.as_deref(),
+    )
+    .max_dimension();
     let pool = sqlx::SqlitePool::connect(&database_url)
         .await
         .map_err(|error| format!("failed to connect to memories database: {error}"))?;
@@ -2258,6 +2269,7 @@ async fn process_memories_from_zip_archives(
             location: location.clone(),
             export_dir: resolved_output_dir.clone(),
             thumbnail_dir: thumbnail_path.clone(),
+            thumbnail_max_dimension,
             keep_originals,
             database_url: database_url.clone(),
         })

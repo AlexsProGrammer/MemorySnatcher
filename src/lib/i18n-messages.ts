@@ -22,6 +22,11 @@ const enMessages = {
   "settings.form.language.de": "Deutsch",
   "settings.form.language.detected": "Detected language: {locale}",
   "settings.form.requestsPerMinute": "Requests per Minute",
+  "settings.form.thumbnailQuality": "Thumbnail quality",
+  "settings.form.thumbnailQuality.360p": "360p",
+  "settings.form.thumbnailQuality.480p": "480p (default)",
+  "settings.form.thumbnailQuality.720p": "720p",
+  "settings.form.thumbnailQuality.1080p": "1080p",
   "settings.form.concurrentDownloads": "Concurrent Downloads",
   "settings.form.warning":
     "Warning: Values above 100 RPM or 5 concurrent downloads may trigger throttling.",
@@ -154,6 +159,11 @@ const deMessages: Record<TranslationKey, string> = {
   "settings.form.language.de": "Deutsch",
   "settings.form.language.detected": "Erkannte Sprache: {locale}",
   "settings.form.requestsPerMinute": "Anfragen pro Minute",
+  "settings.form.thumbnailQuality": "Vorschaubildqualität",
+  "settings.form.thumbnailQuality.360p": "360p",
+  "settings.form.thumbnailQuality.480p": "480p (Standard)",
+  "settings.form.thumbnailQuality.720p": "720p",
+  "settings.form.thumbnailQuality.1080p": "1080p",
   "settings.form.concurrentDownloads": "Gleichzeitige Downloads",
   "settings.form.warning":
     "Warnung: Werte über 100 RPM oder 5 gleichzeitigen Downloads können Drosselung auslösen.",

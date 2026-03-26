@@ -104,7 +104,7 @@ export function Grid({ items, onItemSelect }: GridProps) {
                                 src={item.src}
                                 alt={t("viewer.grid.thumbnailAlt", { id: item.id })}
                                 loading="lazy"
-                                className="block h-full w-full scale-[1.01] bg-background object-cover"
+                                className="block h-full w-full bg-background object-contain"
                                 onError={() => {
                                   console.error("[viewer] Thumbnail failed to load", {
                                     id: item.id,

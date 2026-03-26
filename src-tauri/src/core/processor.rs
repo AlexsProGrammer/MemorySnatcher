@@ -66,6 +66,34 @@ pub enum ProcessMediaResult {
     Duplicate { content_hash: String },
 }
 
+#[derive(Debug, Clone, Copy)]
+pub enum ThumbnailQuality {
+    P360,
+    P480,
+    P720,
+    P1080,
+}
+
+impl ThumbnailQuality {
+    pub fn from_setting(value: Option<&str>) -> Self {
+        match value.map(str::trim).map(str::to_ascii_lowercase).as_deref() {
+            Some("360p") => Self::P360,
+            Some("720p") => Self::P720,
+            Some("1080p") => Self::P1080,
+            Some("480p") | None | Some(_) => Self::P480,
+        }
+    }
+
+    pub fn max_dimension(self) -> u16 {
+        match self {
+            Self::P360 => 360,
+            Self::P480 => 480,
+            Self::P720 => 720,
+            Self::P1080 => 1080,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ProcessMediaInput {
     pub memory_item_id: i64,
@@ -76,6 +104,7 @@ pub struct ProcessMediaInput {
     pub location: Option<String>,
     pub export_dir: PathBuf,
     pub thumbnail_dir: PathBuf,
+    pub thumbnail_max_dimension: u16,
     pub keep_originals: bool,
     pub database_url: String,
 }
@@ -175,7 +204,12 @@ pub async fn process_media(input: ProcessMediaInput) -> Result<ProcessMediaResul
     )
     .await?;
 
-    generate_webp_thumbnail(&final_media_path, &thumbnail_path).await?;
+    generate_webp_thumbnail(
+        &final_media_path,
+        &thumbnail_path,
+        input.thumbnail_max_dimension,
+    )
+    .await?;
 
     eprintln!(
         "[processor-debug] process_media success memory_item_id={} final_media='{}' thumbnail='{}'",
@@ -395,6 +429,7 @@ async fn concat_video_parts(parts: &[PathBuf], output_path: &Path) -> Result<(),
 async fn generate_webp_thumbnail(
     media_path: &Path,
     thumbnail_path: &Path,
+    thumbnail_max_dimension: u16,
 ) -> Result<(), ProcessorError> {
     let media_path = media_path.to_path_buf();
     let thumbnail_path = thumbnail_path.to_path_buf();
@@ -424,15 +459,21 @@ async fn generate_webp_thumbnail(
             args.push("-map".to_string());
             args.push("0:v:0".to_string());
             args.push("-vf".to_string());
+            let scale_filter = format!(
+                "thumbnail,crop=iw-2:ih-2:1:1,scale={0}:{0}:force_original_aspect_ratio=decrease:flags=lanczos",
+                thumbnail_max_dimension
+            );
             args.push(
-                "thumbnail,crop=iw-2:ih-2:1:1,scale=300:300:force_original_aspect_ratio=decrease:flags=lanczos"
-                    .to_string(),
+                scale_filter,
             );
         } else {
             args.push("-vf".to_string());
+            let scale_filter = format!(
+                "crop=iw-2:ih-2:1:1,scale={0}:{0}:force_original_aspect_ratio=decrease:flags=lanczos",
+                thumbnail_max_dimension
+            );
             args.push(
-                "crop=iw-2:ih-2:1:1,scale=300:300:force_original_aspect_ratio=decrease:flags=lanczos"
-                    .to_string(),
+                scale_filter,
             );
         }
 

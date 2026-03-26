@@ -21,6 +21,7 @@ import {
   validateBaseZipArchive,
   type DownloadRateLimitSettings,
   type DownloadProgressPayload,
+  type ThumbnailQuality,
   type ProcessErrorCode,
   type ProcessProgressPayload,
 } from "@/lib/memories-api";
@@ -44,6 +45,11 @@ function loadRateLimitSettings(): DownloadRateLimitSettings | undefined {
     requestsPerMinute: settings.requestsPerMinute,
     concurrentDownloads: settings.concurrentDownloads,
   };
+}
+
+function loadThumbnailQualitySetting(): ThumbnailQuality {
+  const settings = readAppSettings();
+  return settings.thumbnailQuality;
 }
 
 export function Workflow() {
@@ -560,8 +566,18 @@ export function Workflow() {
         );
       }
 
+      const thumbnailQuality = loadThumbnailQualitySetting();
+      pushLogLine(
+        `[${new Date().toISOString().slice(0, 10)}] Thumbnail quality set to ${thumbnailQuality}`,
+      );
+
       setNotice(t("downloader.workflow.status.processing"));
-      const processResult = await processMemoriesFromZipArchives(zipPaths, ".raw_cache", false);
+      const processResult = await processMemoriesFromZipArchives(
+        zipPaths,
+        ".raw_cache",
+        false,
+        thumbnailQuality,
+      );
       setNotice(
         t("downloader.workflow.status.processed", {
           processedCount: processResult.processedCount,

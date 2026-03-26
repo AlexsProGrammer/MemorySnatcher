@@ -6,6 +6,7 @@ export const DOWNLOADER_SESSION_STORAGE_KEY = "memorysnaper.downloader-session.v
 
 export type ThemePreference = "light" | "dark" | "system";
 export type StartupPagePreference = "system" | "downloader" | "viewer";
+export type ThumbnailQualityPreference = "360p" | "480p" | "720p" | "1080p";
 
 export type AppSettings = {
   requestsPerMinute: number;
@@ -13,6 +14,7 @@ export type AppSettings = {
   languagePreference: LanguagePreference;
   themePreference: ThemePreference;
   startupPagePreference: StartupPagePreference;
+  thumbnailQuality: ThumbnailQualityPreference;
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -21,6 +23,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   languagePreference: "system",
   themePreference: "system",
   startupPagePreference: "system",
+  thumbnailQuality: "480p",
 };
 
 export function parseStartupPagePreference(value: string | null): StartupPagePreference {
@@ -37,6 +40,16 @@ export function parseThemePreference(value: string | null): ThemePreference {
   }
 
   return "system";
+}
+
+export function parseThumbnailQualityPreference(
+  value: string | null,
+): ThumbnailQualityPreference {
+  if (value === "360p" || value === "480p" || value === "720p" || value === "1080p") {
+    return value;
+  }
+
+  return "480p";
 }
 
 function normalizeNonNegativeInteger(value: unknown, fallback: number): number {
@@ -77,6 +90,11 @@ function parseSettings(rawValue: string): AppSettings | null {
         ? (Reflect.get(parsedValue, "startupPagePreference") as string)
         : null,
     );
+    const thumbnailQuality = parseThumbnailQualityPreference(
+      typeof Reflect.get(parsedValue, "thumbnailQuality") === "string"
+        ? (Reflect.get(parsedValue, "thumbnailQuality") as string)
+        : null,
+    );
 
     return {
       requestsPerMinute,
@@ -84,6 +102,7 @@ function parseSettings(rawValue: string): AppSettings | null {
       languagePreference,
       themePreference,
       startupPagePreference,
+      thumbnailQuality,
     };
   } catch {
     return null;

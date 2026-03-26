@@ -73,6 +73,8 @@ export type DownloadRateLimitSettings = {
   concurrentDownloads: number;
 };
 
+export type ThumbnailQuality = "360p" | "480p" | "720p" | "1080p";
+
 export type ZipSessionInitResult = {
   jobId: string;
   activeZip: string | null;
@@ -178,10 +180,12 @@ export async function getQueuedCount(): Promise<number> {
 export async function processDownloadedMemories(
   outputDir: string,
   keepOriginals: boolean,
+  thumbnailQuality?: ThumbnailQuality,
 ): Promise<ProcessMemoriesResult> {
   return invoke<ProcessMemoriesResult>("process_downloaded_memories", {
     outputDir,
     keepOriginals,
+    thumbnailQuality,
   });
 }
 
@@ -189,11 +193,13 @@ export async function processMemoriesFromZipArchives(
   zipPaths: string[],
   outputDir: string,
   keepOriginals: boolean,
+  thumbnailQuality?: ThumbnailQuality,
 ): Promise<ProcessMemoriesResult> {
   return invoke<ProcessMemoriesResult>("process_memories_from_zip_archives", {
     zipPaths,
     outputDir,
     keepOriginals,
+    thumbnailQuality,
   });
 }
 

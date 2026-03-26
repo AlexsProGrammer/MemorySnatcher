@@ -3,10 +3,12 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 import {
   clearPersistedAppClientState,
+  parseThumbnailQualityPreference,
   parseStartupPagePreference,
   parseThemePreference,
   readAppSettings,
   writeAppSettings,
+  type ThumbnailQualityPreference,
   type StartupPagePreference,
   type ThemePreference,
 } from "@/lib/app-settings";
@@ -18,6 +20,7 @@ const REQUESTS_WARNING_THRESHOLD = 100;
 const CONCURRENCY_WARNING_THRESHOLD = 5;
 
 const startupPageOptions: StartupPagePreference[] = ["system", "downloader", "viewer"];
+const thumbnailQualityOptions: ThumbnailQualityPreference[] = ["360p", "480p", "720p", "1080p"];
 
 function clampNonNegativeInteger(value: string): number {
   const parsedValue = Number.parseInt(value, 10);
@@ -39,12 +42,32 @@ function resolveThemePreference(value: string | undefined): ThemePreference {
   return parseThemePreference(value);
 }
 
+function resolveThumbnailQualityLabel(
+  value: ThumbnailQualityPreference,
+  t: (key: import("@/lib/i18n-messages").TranslationKey) => string,
+): string {
+  if (value === "360p") {
+    return t("settings.form.thumbnailQuality.360p");
+  }
+
+  if (value === "720p") {
+    return t("settings.form.thumbnailQuality.720p");
+  }
+
+  if (value === "1080p") {
+    return t("settings.form.thumbnailQuality.1080p");
+  }
+
+  return t("settings.form.thumbnailQuality.480p");
+}
+
 export function SettingsForm() {
   const { theme, setTheme } = useTheme();
   const { languagePreference, resolvedLocale, setLanguagePreference, t } = useI18n();
   const [requestsPerMinute, setRequestsPerMinute] = useState<number>(10);
   const [concurrentDownloads, setConcurrentDownloads] = useState<number>(3);
   const [startupPagePreference, setStartupPagePreference] = useState<StartupPagePreference>("system");
+  const [thumbnailQuality, setThumbnailQuality] = useState<ThumbnailQualityPreference>("480p");
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
   const [isResettingAllData, setIsResettingAllData] = useState(false);
   const [resetErrorMessage, setResetErrorMessage] = useState<string | null>(null);
@@ -54,6 +77,7 @@ export function SettingsForm() {
     setRequestsPerMinute(settings.requestsPerMinute);
     setConcurrentDownloads(settings.concurrentDownloads);
     setStartupPagePreference(settings.startupPagePreference);
+    setThumbnailQuality(settings.thumbnailQuality);
     setHasLoadedSettings(true);
   }, []);
 
@@ -68,6 +92,7 @@ export function SettingsForm() {
       languagePreference,
       themePreference: resolveThemePreference(theme),
       startupPagePreference,
+      thumbnailQuality,
     });
   }, [
     concurrentDownloads,
@@ -75,6 +100,7 @@ export function SettingsForm() {
     languagePreference,
     requestsPerMinute,
     startupPagePreference,
+    thumbnailQuality,
     theme,
   ]);
 
@@ -99,6 +125,10 @@ export function SettingsForm() {
 
   const onStartupPagePreferenceChange = (event: ChangeEvent<HTMLSelectElement>) => {
     setStartupPagePreference(parseStartupPagePreference(event.target.value));
+  };
+
+  const onThumbnailQualityChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setThumbnailQuality(parseThumbnailQualityPreference(event.target.value));
   };
 
   const onResetAllData = async () => {
@@ -209,6 +239,24 @@ export function SettingsForm() {
           onChange={onRequestsPerMinuteChange}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
         />
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="thumbnail-quality" className="text-sm font-medium">
+          {t("settings.form.thumbnailQuality")}
+        </label>
+        <select
+          id="thumbnail-quality"
+          value={thumbnailQuality}
+          onChange={onThumbnailQualityChange}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          {thumbnailQualityOptions.map((option) => (
+            <option key={option} value={option}>
+              {resolveThumbnailQualityLabel(option, t)}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div className="space-y-2">
