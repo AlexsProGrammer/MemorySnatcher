@@ -25,6 +25,8 @@ export type AppSettings = {
   videoProfile: VideoProfilePreference;
   imageOutputFormat: ImageOutputFormatPreference;
   imageQuality: ImageQualityPreference;
+  videoAutoplay: boolean;
+  videoMutedByDefault: boolean;
 };
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -37,7 +39,17 @@ const DEFAULT_SETTINGS: AppSettings = {
   videoProfile: "mp4_compatible",
   imageOutputFormat: "jpg",
   imageQuality: "full",
+  videoAutoplay: true,
+  videoMutedByDefault: true,
 };
+
+function parseBooleanSetting(value: unknown, fallback: boolean): boolean {
+  if (typeof value === "boolean") {
+    return value;
+  }
+
+  return fallback;
+}
 
 export function parseStartupPagePreference(value: string | null): StartupPagePreference {
   if (value === "system" || value === "downloader" || value === "viewer") {
@@ -152,6 +164,14 @@ function parseSettings(rawValue: string): AppSettings | null {
         ? (Reflect.get(parsedValue, "imageQuality") as string)
         : null,
     );
+    const videoAutoplay = parseBooleanSetting(
+      Reflect.get(parsedValue, "videoAutoplay"),
+      DEFAULT_SETTINGS.videoAutoplay,
+    );
+    const videoMutedByDefault = parseBooleanSetting(
+      Reflect.get(parsedValue, "videoMutedByDefault"),
+      DEFAULT_SETTINGS.videoMutedByDefault,
+    );
 
     return {
       requestsPerMinute,
@@ -163,6 +183,8 @@ function parseSettings(rawValue: string): AppSettings | null {
       videoProfile,
       imageOutputFormat,
       imageQuality,
+      videoAutoplay,
+      videoMutedByDefault,
     };
   } catch {
     return null;

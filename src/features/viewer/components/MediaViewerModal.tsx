@@ -13,6 +13,7 @@ import {
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 
 import { Button } from "@/components/ui/button";
+import { readAppSettings } from "@/lib/app-settings";
 import { useI18n } from "@/lib/i18n";
 import type { ViewerMediaKind } from "@/lib/memories-api";
 import { MediaMetadataModal } from "@/features/viewer/components/MediaMetadataModal";
@@ -48,6 +49,7 @@ export function MediaViewerModal({
   const [videoLoadError, setVideoLoadError] = useState(false);
   const [videoObjectUrl, setVideoObjectUrl] = useState<string | null>(null);
   const [isVideoLoading, setIsVideoLoading] = useState(false);
+  const [videoAutoplayEnabled, setVideoAutoplayEnabled] = useState(true);
   const [isSoundEnabled, setIsSoundEnabled] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [rotationByItem, setRotationByItem] = useState<Record<string, number>>({});
@@ -87,6 +89,24 @@ export function MediaViewerModal({
     setVideoLoadError(false);
     setIsMetadataOpen(false);
   }, [item?.id, item?.mediaSrc, item?.mediaKind]);
+
+  useEffect(() => {
+    if (!open || !item || item.mediaKind !== "video") {
+      return;
+    }
+
+    const settings = readAppSettings();
+    setVideoAutoplayEnabled(settings.videoAutoplay);
+    setIsSoundEnabled(true);
+
+    const video = videoRef.current;
+    if (video) {
+      if (video.volume <= 0) {
+        video.volume = 1;
+      }
+      video.muted = false;
+    }
+  }, [open, item?.id, item?.mediaKind]);
 
   useEffect(() => {
     if (!open) {
@@ -623,7 +643,7 @@ export function MediaViewerModal({
                   style={mediaStyle}
                   src={videoObjectUrl ?? item.mediaSrc}
                   controls
-                  autoPlay
+                  autoPlay={videoAutoplayEnabled}
                   muted={!isSoundEnabled}
                   playsInline
                   preload="metadata"
@@ -644,11 +664,11 @@ export function MediaViewerModal({
                   <source src={videoObjectUrl ?? item.mediaSrc} />
                 </video>
 
-                {videoLoadError ? (
+                {/* {videoLoadError ? (
                   <p className="max-w-3xl text-center text-xs text-white/85">
                     {t("viewer.modal.videoUnsupported")}
                   </p>
-                ) : null}
+                ) : null} */}
               </div>
             ) : (
               <img

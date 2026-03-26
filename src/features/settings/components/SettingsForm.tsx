@@ -35,6 +35,7 @@ const videoProfileOptions: VideoProfilePreference[] = [
 ];
 const imageOutputFormatOptions: ImageOutputFormatPreference[] = ["jpg", "webp", "png"];
 const imageQualityOptions: ImageQualityPreference[] = ["full", "balanced", "fast"];
+const booleanOptions = [true, false] as const;
 
 function clampNonNegativeInteger(value: string): number {
   const parsedValue = Number.parseInt(value, 10);
@@ -134,6 +135,8 @@ export function SettingsForm() {
   const [videoProfile, setVideoProfile] = useState<VideoProfilePreference>("mp4_compatible");
   const [imageOutputFormat, setImageOutputFormat] = useState<ImageOutputFormatPreference>("jpg");
   const [imageQuality, setImageQuality] = useState<ImageQualityPreference>("full");
+  const [videoAutoplay, setVideoAutoplay] = useState(true);
+  const [videoMutedByDefault, setVideoMutedByDefault] = useState(true);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
   const [isResettingAllData, setIsResettingAllData] = useState(false);
   const [resetErrorMessage, setResetErrorMessage] = useState<string | null>(null);
@@ -147,6 +150,8 @@ export function SettingsForm() {
     setVideoProfile(settings.videoProfile);
     setImageOutputFormat(settings.imageOutputFormat);
     setImageQuality(settings.imageQuality);
+    setVideoAutoplay(settings.videoAutoplay);
+    setVideoMutedByDefault(settings.videoMutedByDefault);
     setHasLoadedSettings(true);
   }, []);
 
@@ -165,6 +170,8 @@ export function SettingsForm() {
       videoProfile,
       imageOutputFormat,
       imageQuality,
+      videoAutoplay,
+      videoMutedByDefault,
     });
   }, [
     concurrentDownloads,
@@ -176,6 +183,8 @@ export function SettingsForm() {
     videoProfile,
     imageOutputFormat,
     imageQuality,
+    videoAutoplay,
+    videoMutedByDefault,
     theme,
   ]);
 
@@ -216,6 +225,14 @@ export function SettingsForm() {
 
   const onImageQualityChange = (event: ChangeEvent<HTMLSelectElement>) => {
     setImageQuality(parseImageQualityPreference(event.target.value));
+  };
+
+  const onVideoAutoplayChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setVideoAutoplay(event.target.value === "true");
+  };
+
+  const onVideoMutedByDefaultChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    setVideoMutedByDefault(event.target.value === "true");
   };
 
   const onResetAllData = async () => {
@@ -395,6 +412,42 @@ export function SettingsForm() {
           {imageQualityOptions.map((option) => (
             <option key={option} value={option}>
               {resolveImageQualityLabel(option, t)}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="video-autoplay" className="text-sm font-medium">
+          {t("settings.form.videoAutoplay")}
+        </label>
+        <select
+          id="video-autoplay"
+          value={String(videoAutoplay)}
+          onChange={onVideoAutoplayChange}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          {booleanOptions.map((value) => (
+            <option key={String(value)} value={String(value)}>
+              {value ? t("settings.form.boolean.true") : t("settings.form.boolean.false")}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <label htmlFor="video-muted-default" className="text-sm font-medium">
+          {t("settings.form.videoMutedByDefault")}
+        </label>
+        <select
+          id="video-muted-default"
+          value={String(videoMutedByDefault)}
+          onChange={onVideoMutedByDefaultChange}
+          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+        >
+          {booleanOptions.map((value) => (
+            <option key={String(value)} value={String(value)}>
+              {value ? t("settings.form.boolean.true") : t("settings.form.boolean.false")}
             </option>
           ))}
         </select>

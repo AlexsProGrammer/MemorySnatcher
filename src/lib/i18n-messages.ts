@@ -40,6 +40,10 @@ const enMessages = {
   "settings.form.imageQuality.full": "Full quality (default)",
   "settings.form.imageQuality.balanced": "Balanced quality",
   "settings.form.imageQuality.fast": "Fast encode",
+  "settings.form.videoAutoplay": "Video autoplay",
+  "settings.form.videoMutedByDefault": "Video starts muted",
+  "settings.form.boolean.true": "True",
+  "settings.form.boolean.false": "False",
   "settings.form.concurrentDownloads": "Concurrent Downloads",
   "settings.form.warning":
     "Warning: Values above 100 RPM or 5 concurrent downloads may trigger throttling.",
@@ -190,6 +194,10 @@ const deMessages: Record<TranslationKey, string> = {
   "settings.form.imageQuality.full": "Volle Qualität (Standard)",
   "settings.form.imageQuality.balanced": "Ausgewogene Qualität",
   "settings.form.imageQuality.fast": "Schnelle Kodierung",
+  "settings.form.videoAutoplay": "Video automatisch abspielen",
+  "settings.form.videoMutedByDefault": "Video startet stumm",
+  "settings.form.boolean.true": "Wahr",
+  "settings.form.boolean.false": "Falsch",
   "settings.form.concurrentDownloads": "Gleichzeitige Downloads",
   "settings.form.warning":
     "Warnung: Werte über 100 RPM oder 5 gleichzeitigen Downloads können Drosselung auslösen.",
