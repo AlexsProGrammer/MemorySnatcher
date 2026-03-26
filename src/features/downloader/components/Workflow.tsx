@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
+import { Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
@@ -793,6 +794,11 @@ export function Workflow() {
 
           <div className="flex gap-2">
             <Button type="button" onClick={() => { void onStartSession(); }} disabled={!canStart}>
+              {isWorking && !isStopped ? (
+                <Loader2
+                  className={`mr-2 h-4 w-4 animate-spin ${isPaused ? "paused" : ""}`}
+                />
+              ) : null}
               Start Session
             </Button>
             <Button type="button" variant="outline" onClick={onRemoveSelection} disabled={isWorking && !isStopped}>
