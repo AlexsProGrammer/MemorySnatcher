@@ -2,7 +2,7 @@ import {
   Files,
   CopySlash,
   AlertTriangle,
-  Download,
+  PackageCheck,
   Cog,
 } from "lucide-react";
 
@@ -131,7 +131,7 @@ export function ProgressOverview({
           variant="muted"
         />
         <StatCard
-          icon={<Download className="h-4 w-4" />}
+          icon={<PackageCheck className="h-4 w-4" />}
           label={t("downloader.progress.stat.downloaded")}
           value={`${completedDownloaded} / ${totalFiles}`}
         />
