@@ -34,7 +34,7 @@ export function LiveConsole({ logLines }: LiveConsoleProps) {
     <Accordion type="single" collapsible defaultValue="console">
       <AccordionItem value="console" className="border rounded-lg">
         <AccordionTrigger className="px-4 py-3 hover:no-underline">
-          <div className="flex items-center gap-2 text-sm font-medium">
+          <div className="flex flex-1 items-center gap-2 text-sm font-medium">
             <Terminal className="h-4 w-4 text-muted-foreground" />
             {t("downloader.console.title")}
             {logLines.length > 0 && (
@@ -42,27 +42,25 @@ export function LiveConsole({ logLines }: LiveConsoleProps) {
                 ({logLines.length})
               </span>
             )}
-          </div>
-        </AccordionTrigger>
-        <AccordionContent className="px-4 pb-4">
-          <div className="flex justify-end mb-2">
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              onClick={onCopyLogs}
+              onClick={(e) => { e.stopPropagation(); onCopyLogs(); }}
               disabled={logLines.length === 0}
-              className="h-7 text-xs gap-1"
+              className="ml-auto mr-2 h-6 px-2 text-xs gap-1 text-muted-foreground"
             >
               <Copy className="h-3 w-3" />
               {t("downloader.console.copy")}
             </Button>
           </div>
+        </AccordionTrigger>
+        <AccordionContent className="h-auto px-4 pb-4">
           <div
             ref={scrollRef}
             role="log"
             aria-live="polite"
-            className="max-h-48 overflow-auto rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed text-muted-foreground"
+            className="h-64 overflow-auto rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed text-muted-foreground"
           >
             {logLines.length === 0 ? (
               <p className="italic">{t("downloader.console.empty")}</p>
