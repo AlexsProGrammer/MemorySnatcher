@@ -2517,6 +2517,43 @@ async fn mark_remaining_units_pending(
     Ok(())
 }
 
+#[tauri::command]
+fn get_media_storage_path(app: tauri::AppHandle) -> Result<String, String> {
+    resolve_output_dir(&app, ".raw_cache")
+        .map(|path| path.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn open_media_folder(app: tauri::AppHandle) -> Result<(), String> {
+    let path = resolve_output_dir(&app, ".raw_cache")?;
+    
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|error| format!("failed to open folder: {error}"))?;
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|error| format!("failed to open folder: {error}"))?;
+    }
+    
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|error| format!("failed to open folder: {error}"))?;
+    }
+    
+    Ok(())
+}
+
 fn find_output_file_for_memory_item(
     output_dir: &std::path::Path,
     memory_item_id: i64,
@@ -3449,6 +3486,8 @@ pub fn run() {
             process_downloaded_memories,
             get_thumbnails,
             get_viewer_items,
+            get_media_storage_path,
+            open_media_folder,
             create_settings_media_backup_zip,
             create_viewer_export_zip,
             import_viewer_export_zip,

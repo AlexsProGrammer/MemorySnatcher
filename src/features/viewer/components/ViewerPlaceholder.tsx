@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { Download, ImageIcon } from "lucide-react";
+import { Download, FolderOpen, ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -27,6 +27,7 @@ import {
 import { useI18n } from "@/lib/i18n";
 import {
   createViewerExportZip,
+  openMediaFolder,
   getViewerItems,
   type ViewerMediaKind,
 } from "@/lib/memories-api";
@@ -123,6 +124,14 @@ export function ViewerPlaceholder() {
       toast.error(t("viewer.export.error"));
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const onOpenMediaFolder = async () => {
+    try {
+      await openMediaFolder();
+    } catch {
+      toast.error(t("viewer.openFolder.error"));
     }
   };
 
@@ -348,6 +357,17 @@ export function ViewerPlaceholder() {
           <p className="text-sm text-muted-foreground">{status}</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => { void onOpenMediaFolder(); }}
+            disabled={items.length === 0}
+            className="gap-1.5"
+          >
+            <FolderOpen className="h-3.5 w-3.5" />
+            {t("viewer.openFolder.button")}
+          </Button>
           <Button
             type="button"
             variant="outline"

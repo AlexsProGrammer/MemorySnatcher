@@ -277,6 +277,14 @@ export async function importViewerExportZip(
   return invoke<ViewerArchiveImportResult>("import_viewer_export_zip", { archivePath });
 }
 
+export async function getMediaStoragePath(): Promise<string> {
+  return invoke<string>("get_media_storage_path");
+}
+
+export async function openMediaFolder(): Promise<void> {
+  return invoke<void>("open_media_folder");
+}
+
 export async function onDownloadProgress(
   callback: (payload: DownloadProgressPayload) => void,
 ): Promise<UnlistenFn> {
