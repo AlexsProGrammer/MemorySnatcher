@@ -286,7 +286,7 @@ fn memories_db_url(app: &tauri::AppHandle) -> Result<String, String> {
 
     app_data_dir.push("memories.db");
 
-    Ok(format!("sqlite://{}", app_data_dir.to_string_lossy()))
+    Ok(core::sqlite_url_from_path(&app_data_dir))
 }
 
 fn resolve_output_dir(app: &tauri::AppHandle, output_dir: &str) -> Result<std::path::PathBuf, String> {
@@ -3028,7 +3028,7 @@ async fn import_viewer_export_zip(
         let source_media_dir = import_root.join("media");
         let source_thumbnail_dir = import_root.join("thumbnails");
 
-        let source_db_url = format!("sqlite://{}", source_db_path.to_string_lossy());
+        let source_db_url = core::sqlite_url_from_path(&source_db_path);
         let target_db_url = memories_db_url(&app)?;
 
         let source_pool = sqlx::SqlitePool::connect(&source_db_url)

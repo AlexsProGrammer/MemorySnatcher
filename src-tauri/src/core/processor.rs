@@ -448,8 +448,10 @@ async fn concat_video_parts(parts: &[PathBuf], output_path: &Path) -> Result<(),
 
         for part in &parts {
             let absolute_part_path = std::fs::canonicalize(part).unwrap_or_else(|_| part.clone());
-            let escaped_path = absolute_part_path.to_string_lossy().replace('\'', "'\\''");
-            list_content.push_str(&format!("file '{}'\n", escaped_path));
+            list_content.push_str(&format!(
+                "file '{}'\n",
+                escape_ffmpeg_concat_entry_path(&absolute_part_path)
+            ));
         }
 
         std::fs::write(&list_path, list_content)?;
@@ -461,18 +463,16 @@ async fn concat_video_parts(parts: &[PathBuf], output_path: &Path) -> Result<(),
         );
 
         let output = Command::new("ffmpeg")
-            .args([
-                "-y",
-                "-f",
-                "concat",
-                "-safe",
-                "0",
-                "-i",
-                &list_path_for_ffmpeg.to_string_lossy(),
-                "-c",
-                "copy",
-                &output_path.to_string_lossy(),
-            ])
+            .arg("-y")
+            .arg("-f")
+            .arg("concat")
+            .arg("-safe")
+            .arg("0")
+            .arg("-i")
+            .arg(&list_path_for_ffmpeg)
+            .arg("-c")
+            .arg("copy")
+            .arg(&output_path)
             .output()
             .map_err(ProcessorError::Io)?;
 
@@ -488,6 +488,13 @@ async fn concat_video_parts(parts: &[PathBuf], output_path: &Path) -> Result<(),
         })
     })
     .await?
+}
+
+fn escape_ffmpeg_concat_entry_path(path: &Path) -> String {
+    path
+        .to_string_lossy()
+        .replace('\\', "/")
+        .replace('\'', "'\\''")
 }
 
 async fn generate_webp_thumbnail(

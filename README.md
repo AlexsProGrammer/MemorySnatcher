@@ -28,6 +28,151 @@ MemorySnaper is a privacy-first desktop application built with Tauri, React, and
 - [Rust](https://rustup.rs/) (stable toolchain, 1.77+)
 - [pnpm](https://pnpm.io/) (recommended) or npm
 
+## Install / Setup
+
+Use the OS-specific steps below for a clean local setup.
+
+### Linux (tested)
+
+1. Install system dependencies (Debian/Ubuntu example):
+
+```bash
+sudo apt update
+sudo apt install -y \
+    build-essential \
+    curl \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    patchelf \
+    gstreamer1.0-libav \
+    gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad \
+    gstreamer1.0-plugins-ugly
+```
+
+2. Install Rust toolchain:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+```
+
+3. Install Node.js (18+) and pnpm:
+
+```bash
+node -v
+npm -v
+npm install -g pnpm
+```
+
+4. Install and run project:
+
+```bash
+git clone https://github.com/AlexsdeG/MemorySnaper.git
+cd MemorySnaper
+pnpm install
+pnpm tauri dev
+```
+
+### Windows (tested)
+
+1. Install required tooling:
+- Node.js 18+
+- Rust via rustup (https://rustup.rs/)
+- Visual Studio Build Tools 2022 with "Desktop development with C++"
+- WebView2 Runtime (usually already installed on Windows 11)
+
+2. Open a new PowerShell terminal and verify toolchain:
+
+```powershell
+node -v
+npm -v
+rustc -V
+cargo -V
+cl
+```
+
+3. Install pnpm (optional) and run project:
+
+```powershell
+npm install -g pnpm
+git clone https://github.com/AlexsdeG/MemorySnaper.git
+Set-Location MemorySnaper
+pnpm install
+pnpm tauri dev
+```
+
+4. If you prefer npm instead of pnpm:
+
+```powershell
+npm install
+npm run tauri dev
+```
+
+### macOS (untested)
+
+MemorySnaper has not been fully tested on macOS yet, but these are the expected setup steps.
+
+1. Install Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+2. Install Rust:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source "$HOME/.cargo/env"
+```
+
+3. Install Node.js 18+ and pnpm, then run:
+
+```bash
+git clone https://github.com/AlexsdeG/MemorySnaper.git
+cd MemorySnaper
+npm install -g pnpm
+pnpm install
+pnpm tauri dev
+```
+
+4. If build fails on macOS, please open an issue with:
+- macOS version
+- Xcode version
+- Full output from `pnpm tauri dev`
+
+#### Windows prerequisites
+
+- Install **Visual Studio Build Tools 2022** with the "Desktop development with C++" workload.
+- Install **WebView2 Runtime** (usually already present on Windows 11).
+- Ensure `cargo`, `rustc`, and `cl` are available in a new terminal session.
+
+#### macOS prerequisites
+
+- Install Xcode Command Line Tools:
+
+```bash
+xcode-select --install
+```
+
+#### Linux prerequisites
+
+- Install GTK/WebKit build dependencies (example for Debian/Ubuntu):
+
+```bash
+sudo apt update
+sudo apt install -y \
+    build-essential \
+    curl \
+    libwebkit2gtk-4.1-dev \
+    libgtk-3-dev \
+    libayatana-appindicator3-dev \
+    librsvg2-dev \
+    patchelf
+```
+
 #### Linux video playback prerequisites (system codecs)
 
 MemorySnaper relies on your system WebKit/GStreamer stack for in-app MP4 playback (no bundled proprietary codec packs).
@@ -54,7 +199,7 @@ cd MemorySnaper
 # 2. Install JavaScript dependencies
 pnpm install        # or: npm install
 
-# 3. Start the development build (Vite frontend + Tauri shell)
+# 3. Start the development build (runs an environment check, then Vite + Tauri)
 pnpm tauri dev      # or: npm run tauri dev
 ```
 

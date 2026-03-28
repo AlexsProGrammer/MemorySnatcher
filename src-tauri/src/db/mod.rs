@@ -42,7 +42,7 @@ fn memories_db_url(app: &tauri::AppHandle) -> Result<String, String> {
 
 	app_data_dir.push("memories.db");
 
-	Ok(format!("sqlite://{}", app_data_dir.to_string_lossy()))
+	Ok(core::sqlite_url_from_path(&app_data_dir))
 }
 
 #[tauri::command]
