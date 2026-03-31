@@ -306,6 +306,10 @@ export async function getDiskSpace(path: string): Promise<DiskSpaceInfo> {
   return invoke<DiskSpaceInfo>("get_disk_space", { path });
 }
 
+export async function getFilesTotalSize(paths: string[]): Promise<number> {
+  return invoke<number>("get_files_total_size", { paths });
+}
+
 export async function onDownloadProgress(
   callback: (payload: DownloadProgressPayload) => void,
 ): Promise<UnlistenFn> {

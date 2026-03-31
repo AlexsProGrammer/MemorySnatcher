@@ -108,6 +108,15 @@ const enMessages = {
   "downloader.exportPath.label": "Export location",
   "downloader.exportPath.change": "Change",
 
+  "downloader.storageBar.freeOfTotal": "{free} free of {total}",
+  "downloader.storageBar.estimated": "~{size} needed",
+  "downloader.storageBar.insufficient": "Not enough disk space",
+  "downloader.storageBar.insufficientDetail":
+    "Estimated {needed} needed but only {free} available on the export drive. Processing may fail.",
+  "downloader.storageBar.proceedAnyway": "Start anyway",
+  "downloader.storageBar.cancel": "Cancel",
+  "downloader.storageBar.warningTitle": "Low Disk Space",
+
   "downloader.card.title": "Extractor",
   "downloader.card.description": "Import Snapchat export data and download queued memories.",
   "downloader.workflow.upload.title": "Upload Snapchat Export",
@@ -412,6 +421,15 @@ const deMessages: Record<TranslationKey, string> = {
 
   "downloader.exportPath.label": "Exportziel",
   "downloader.exportPath.change": "Ändern",
+
+  "downloader.storageBar.freeOfTotal": "{free} frei von {total}",
+  "downloader.storageBar.estimated": "~{size} benötigt",
+  "downloader.storageBar.insufficient": "Nicht genug Speicherplatz",
+  "downloader.storageBar.insufficientDetail":
+    "Geschätzt {needed} benötigt, aber nur {free} auf dem Exportlaufwerk verfügbar. Verarbeitung kann fehlschlagen.",
+  "downloader.storageBar.proceedAnyway": "Trotzdem starten",
+  "downloader.storageBar.cancel": "Abbrechen",
+  "downloader.storageBar.warningTitle": "Wenig Speicherplatz",
 
   "downloader.card.title": "Extraktor",
   "downloader.card.description":

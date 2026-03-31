@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { open } from "@tauri-apps/plugin-dialog";
+import { open, message } from "@tauri-apps/plugin-dialog";
 import { Archive, PackageOpen, FolderOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,13 @@ import { LiveConsole } from "@/features/downloader/components/LiveConsole";
 import { ProgressOverview } from "@/features/downloader/components/ProgressOverview";
 import { ZipSelector } from "@/features/downloader/components/ZipSelector";
 import { ZipStatus } from "@/features/downloader/components/ZipStatus";
+import { StorageBar, estimateRequiredBytes, formatBytes } from "@/features/downloader/components/StorageBar";
 import { useI18n } from "@/lib/i18n";
 import {
   finalizeZipSession,
+  getDiskSpace,
   getExportPath,
+  getFilesTotalSize,
   getProcessingSessionOverview,
   importMemoriesFromZip,
   importViewerExportZip,
@@ -590,6 +593,36 @@ export function Workflow() {
       return;
     }
 
+    // Pre-start storage check
+    if (currentExportPath) {
+      try {
+        const [space, totalZipSize] = await Promise.all([
+          getDiskSpace(currentExportPath),
+          getFilesTotalSize(selectedZipPaths),
+        ]);
+        const estimated = estimateRequiredBytes(totalZipSize);
+        if (estimated > space.freeBytes) {
+          const result = await message(
+            t("downloader.storageBar.insufficientDetail", {
+              needed: formatBytes(estimated),
+              free: formatBytes(space.freeBytes),
+            }),
+            {
+              title: t("downloader.storageBar.warningTitle"),
+              kind: "warning",
+              buttons: {
+                ok: t("downloader.storageBar.proceedAnyway"),
+                cancel: t("downloader.storageBar.cancel"),
+              },
+            },
+          );
+          if (result === "Cancel") return;
+        }
+      } catch {
+        // disk space query failed — not a reason to block
+      }
+    }
+
     try {
       await resumeProcessingSession();
       setLogLines([]);
@@ -854,6 +887,14 @@ export function Workflow() {
             {t("downloader.exportPath.change")}
           </Button>
         </div>
+      )}
+
+      {/* Storage bar */}
+      {currentExportPath && selectedZipPaths.length > 0 && (
+        <StorageBar
+          exportPath={currentExportPath}
+          zipPaths={selectedZipPaths}
+        />
       )}
 
       {/* Action Bar */}

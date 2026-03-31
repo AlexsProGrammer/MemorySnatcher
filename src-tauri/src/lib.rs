@@ -2679,6 +2679,17 @@ fn get_disk_space(path: String) -> Result<DiskSpaceInfo, String> {
     })
 }
 
+#[tauri::command]
+fn get_files_total_size(paths: Vec<String>) -> Result<u64, String> {
+    let mut total: u64 = 0;
+    for p in &paths {
+        let meta = std::fs::metadata(p)
+            .map_err(|error| format!("cannot stat {p}: {error}"))?;
+        total += meta.len();
+    }
+    Ok(total)
+}
+
 fn find_output_file_for_memory_item(
     output_dir: &std::path::Path,
     memory_item_id: i64,
@@ -3632,7 +3643,8 @@ pub fn run() {
             get_export_path,
             get_default_export_path,
             set_export_path,
-            get_disk_space
+            get_disk_space,
+            get_files_total_size
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
