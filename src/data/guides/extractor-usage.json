@@ -1,0 +1,59 @@
+{
+  "id": "extractor-usage",
+  "icon": "PackageOpen",
+  "title": {
+    "en": "How to Use the Extractor",
+    "de": "So verwendest du den Extraktor"
+  },
+  "description": {
+    "en": "Learn how to select your ZIP files, start extraction, and use pause/resume controls.",
+    "de": "Erfahre, wie du deine ZIP-Dateien auswählst, die Extraktion startest und die Pause-/Fortsetzen-Steuerung nutzt."
+  },
+  "relatedPage": "downloader",
+  "pages": [
+    {
+      "image": "/tutorials/extractor-usage/step1.svg",
+      "title": {
+        "en": "Select Your ZIP Files",
+        "de": "Wähle deine ZIP-Dateien"
+      },
+      "body": {
+        "en": "Click 'Select ZIP Files' and choose the main Snapchat export file (mydata~<id>.zip). If you have additional numbered parts, select those too.",
+        "de": "Klicke auf 'ZIP-Dateien auswählen' und wähle die Hauptdatei des Snapchat-Exports (mydata~<id>.zip). Falls du zusätzliche nummerierte Teile hast, wähle diese ebenfalls aus."
+      }
+    },
+    {
+      "image": "/tutorials/extractor-usage/step2.svg",
+      "title": {
+        "en": "Review Disclaimers",
+        "de": "Hinweise lesen"
+      },
+      "body": {
+        "en": "Read the storage and processing disclaimers. Check the boxes to confirm you understand the requirements, then click 'Start'.",
+        "de": "Lies die Speicher- und Verarbeitungshinweise. Setze die Häkchen zur Bestätigung, dann klicke auf 'Start'."
+      }
+    },
+    {
+      "image": "/tutorials/extractor-usage/step3.svg",
+      "title": {
+        "en": "Monitor Progress",
+        "de": "Fortschritt überwachen"
+      },
+      "body": {
+        "en": "Watch the progress bar and live console. You'll see files being processed, duplicates being skipped, and which ZIP is currently active.",
+        "de": "Verfolge den Fortschrittsbalken und die Live-Konsole. Du siehst, wie Dateien verarbeitet werden, Duplikate übersprungen werden und welche ZIP gerade aktiv ist."
+      }
+    },
+    {
+      "image": "/tutorials/extractor-usage/step4.svg",
+      "title": {
+        "en": "Pause, Resume & Stop",
+        "de": "Pausieren, Fortsetzen & Stoppen"
+      },
+      "body": {
+        "en": "Use 'Pause' to temporarily halt processing — your progress is saved. Click 'Resume' to continue. 'Stop' ends the session gracefully; you can reload state later.",
+        "de": "Nutze 'Pause', um die Verarbeitung vorübergehend anzuhalten — dein Fortschritt wird gespeichert. Klicke 'Fortsetzen', um weiterzumachen. 'Stopp' beendet die Sitzung sauber; du kannst den Zustand später neu laden."
+      }
+    }
+  ]
+}

@@ -317,6 +317,22 @@ const enMessages = {
   "viewer.metadata.coordinates": "Coordinates",
   "viewer.metadata.noLocation": "—",
   "viewer.metadata.close": "Close",
+
+  "guide.dialog.prev": "Previous",
+  "guide.dialog.next": "Next",
+  "guide.dialog.done": "Done",
+  "guide.dialog.pageIndicator": "{current} of {total}",
+  "guide.list.title": "Help & Guides",
+  "guide.list.gettingStarted": "Getting Started",
+  "guide.list.pageGuides": "Page Guides",
+  "app.sidebar.help": "Help",
+  "downloader.workflow.guideLink": "How to export from Snapchat?",
+  "help.settings.videoProfile": "Choose the output video container and codec. 'Auto' picks the best option for your system. Use MP4 for broadest compatibility.",
+  "help.settings.imageFormat": "JPG is smallest and most compatible. WebP offers better compression. PNG is lossless but larger.",
+  "help.settings.requestsPerMinute": "Limits how fast media is downloaded from Snapchat servers. Higher values are faster but risk rate-limiting.",
+  "help.settings.hwAcceleration": "Uses your GPU for video playback in the viewer. Disable if videos show artifacts or fail to play.",
+  "help.settings.thumbnailQuality": "Resolution of generated thumbnail previews. Higher quality uses more disk space.",
+  "settings.data.showSetupGuide": "Show setup guide",
 } as const;
 
 export type TranslationKey = keyof typeof enMessages;
@@ -644,6 +660,22 @@ const deMessages: Record<TranslationKey, string> = {
   "viewer.metadata.coordinates": "Koordinaten",
   "viewer.metadata.noLocation": "—",
   "viewer.metadata.close": "Schließen",
+
+  "guide.dialog.prev": "Zurück",
+  "guide.dialog.next": "Weiter",
+  "guide.dialog.done": "Fertig",
+  "guide.dialog.pageIndicator": "{current} von {total}",
+  "guide.list.title": "Hilfe & Anleitungen",
+  "guide.list.gettingStarted": "Erste Schritte",
+  "guide.list.pageGuides": "Seitenanleitungen",
+  "app.sidebar.help": "Hilfe",
+  "downloader.workflow.guideLink": "Wie exportiere ich aus Snapchat?",
+  "help.settings.videoProfile": "Wähle den Videocontainer und Codec. 'Automatisch' wählt die beste Option für dein System. MP4 bietet die breiteste Kompatibilität.",
+  "help.settings.imageFormat": "JPG ist am kleinsten und kompatibelsten. WebP bietet bessere Komprimierung. PNG ist verlustfrei, aber größer.",
+  "help.settings.requestsPerMinute": "Begrenzt die Download-Geschwindigkeit von Snapchat-Servern. Höhere Werte sind schneller, riskieren aber eine Ratenbegrenzung.",
+  "help.settings.hwAcceleration": "Nutzt deine GPU für die Videowiedergabe im Betrachter. Deaktiviere dies bei Artefakten oder Wiedergabeproblemen.",
+  "help.settings.thumbnailQuality": "Auflösung der generierten Vorschaubilder. Höhere Qualität benötigt mehr Speicherplatz.",
+  "settings.data.showSetupGuide": "Einrichtungsanleitung anzeigen",
 };
 
 type TranslationDictionary = Record<TranslationKey, string>;

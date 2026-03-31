@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -12,6 +12,8 @@ import { applyAccentColor, readAppSettings } from "@/lib/app-settings";
 import { useI18n } from "@/lib/i18n";
 import { getViewerItems } from "@/lib/memories-api";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { GuideDialog } from "@/components/GuideDialog";
+import { getGuideById } from "@/data/guides/index";
 
 function AppSkeleton() {
   return (
@@ -43,6 +45,15 @@ function App() {
   const [activeTab, setActiveTab] = useState<TabKey | null>(null);
   const { t } = useI18n();
   const isMobile = useIsMobile();
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
+  const onboardingGuide = getGuideById("first-time-setup") ?? null;
+
+  const handleOnboardingChange = useCallback((open: boolean) => {
+    setOnboardingOpen(open);
+    if (!open) {
+      localStorage.setItem("onboarding-complete", "1");
+    }
+  }, []);
 
   useEffect(() => {
     const settings = readAppSettings();
@@ -65,6 +76,12 @@ function App() {
         setActiveTab("downloader");
       });
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== null && !localStorage.getItem("onboarding-complete")) {
+      setOnboardingOpen(true);
+    }
+  }, [activeTab]);
 
   const tabContent = useMemo(() => {
     switch (activeTab) {
@@ -118,6 +135,8 @@ function App() {
         {/* Mobile bottom nav */}
         {isMobile && <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />}
       </SidebarProvider>
+
+      <GuideDialog guide={onboardingGuide} open={onboardingOpen} onOpenChange={handleOnboardingChange} />
     </TooltipProvider>
   );
 }

@@ -1,4 +1,5 @@
-import { Download, Images, Settings, Camera } from "lucide-react";
+import { useState } from "react";
+import { Download, Images, Settings, Camera, CircleHelp } from "lucide-react";
 
 import {
   Sidebar,
@@ -14,6 +15,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useI18n } from "@/lib/i18n";
+import { GuideListSheet } from "@/components/GuideListSheet";
 
 export type TabKey = "downloader" | "viewer" | "settings";
 
@@ -31,6 +33,7 @@ const NAV_ICONS: Record<TabKey, React.ComponentType<{ className?: string }>> = {
 export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
   const { t } = useI18n();
   const { state } = useSidebar();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const navItems: Array<{ key: TabKey; label: string }> = [
     { key: "downloader", label: t("app.tabs.downloader") },
@@ -87,9 +90,19 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={t("app.sidebar.help")}
+              onClick={() => setHelpOpen(true)}
+            >
+              <CircleHelp className="size-4" />
+              <span>{t("app.sidebar.help")}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
             <SidebarTrigger className="w-full justify-start" />
           </SidebarMenuItem>
         </SidebarMenu>
+        <GuideListSheet open={helpOpen} onOpenChange={setHelpOpen} />
       </SidebarFooter>
     </Sidebar>
   );

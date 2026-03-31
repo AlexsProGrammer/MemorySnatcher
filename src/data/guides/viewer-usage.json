@@ -1,0 +1,48 @@
+{
+  "id": "viewer-usage",
+  "icon": "Images",
+  "title": {
+    "en": "How to Use the Viewer",
+    "de": "So verwendest du den Betrachter"
+  },
+  "description": {
+    "en": "Browse, filter, and view your extracted Snapchat memories.",
+    "de": "Durchsuche, filtere und betrachte deine extrahierten Snapchat-Erinnerungen."
+  },
+  "relatedPage": "viewer",
+  "pages": [
+    {
+      "image": "/tutorials/viewer-usage/step1.svg",
+      "title": {
+        "en": "Open the Viewer",
+        "de": "Betrachter öffnen"
+      },
+      "body": {
+        "en": "Switch to the Viewer tab. Your processed memories appear as a thumbnail grid, sorted by date.",
+        "de": "Wechsle zum Betrachter-Tab. Deine verarbeiteten Erinnerungen erscheinen als Vorschau-Raster, sortiert nach Datum."
+      }
+    },
+    {
+      "image": "/tutorials/viewer-usage/step2.svg",
+      "title": {
+        "en": "Filter & Search",
+        "de": "Filtern & Suchen"
+      },
+      "body": {
+        "en": "Use the filter bar to narrow results by date range, media type (photo/video), or location. Type in the search box to find specific memories.",
+        "de": "Nutze die Filterleiste, um Ergebnisse nach Zeitraum, Medientyp (Foto/Video) oder Standort einzugrenzen. Tippe in das Suchfeld, um bestimmte Erinnerungen zu finden."
+      }
+    },
+    {
+      "image": "/tutorials/viewer-usage/step3.svg",
+      "title": {
+        "en": "View Full Screen",
+        "de": "Vollbildansicht"
+      },
+      "body": {
+        "en": "Click any thumbnail to open it in full-screen mode. Use arrow keys or swipe to navigate between memories. Click the info icon to see metadata (date, location, type).",
+        "de": "Klicke auf ein Vorschaubild, um es im Vollbildmodus zu öffnen. Nutze die Pfeiltasten oder wische, um zwischen Erinnerungen zu navigieren. Klicke auf das Info-Symbol, um Metadaten zu sehen (Datum, Standort, Typ)."
+      }
+    }
+  ]
+}

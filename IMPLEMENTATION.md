@@ -102,3 +102,43 @@ Here is the comprehensive, strictly formatted `IMPLEMENTATION.md` blueprint to h
    - Verifies: Loop pauses without crashing, resumes correctly
    - Status: Items remain PENDING when stopped; resume continues from where paused
    - **Remaining:** Manual UI test with demo data to confirm session recovery on app restart
+
+---
+
+## 4. In-App Tutorials, Help Tooltips & Setup Guides
+
+> **Goal:** Add a JSON-driven tutorial/help system with step-by-step guide dialogs (modal carousel with images + i18n text), contextual `?` help tooltips per page, and a global help menu in the sidebar. Guide content lives in per-guide JSON files with inline locale text for easy editing. UI chrome strings use the existing i18n system. No new npm dependencies, no Rust changes.
+
+### Phase T1: Data Layer & JSON Guide Structure
+
+- [x] **Step T1.1:** Create `src/data/guides/types.ts` with types `LocaleText`, `GuidePage`, and `Guide`. Create directory `public/tutorials/` for guide images (subdirectory per guide ID).
+- [x] **Step T1.2:** Create 4 initial guide JSON stubs in `src/data/guides/`: `snapchat-export.json`, `extractor-usage.json`, `viewer-usage.json`, `first-time-setup.json`. Each has inline `{ en, de }` locale text and placeholder image paths.
+- [x] **Step T1.3:** Create `src/data/guides/index.ts` — imports all JSON files, exports typed `guides` array, `getGuideById(id)`, and `getGuidesForPage(page)`.
+- [x] **Verification:** `npm run build` succeeds, TypeScript types are correct, each JSON file validates against the `Guide` type. **Status:** ✅ VERIFIED — `tsc --noEmit` and `vite build` both pass with zero errors.
+
+### Phase T2: Reusable UI Components
+
+- [x] **Step T2.1:** Create `src/components/HelpTooltip.tsx` — `CircleHelp` icon + `Tooltip` with `variant="popover"`, `helpKey: TranslationKey` prop.
+- [x] **Step T2.2:** Create `src/components/GuideDialog.tsx` — modal stepper carousel using existing `Dialog`. Internal page state, image/title/body rendering, Prev/Next/Done buttons, page indicator dots.
+- [x] **Step T2.3:** Create `src/components/GuideListSheet.tsx` — `Sheet` with grouped guide list (Getting Started + per-page). Clicking opens `GuideDialog`.
+- [x] **Verification:** Components render correctly in isolation. Guide dialog shows pages, navigation works, locale text resolves. **Status:** ✅ VERIFIED — `tsc --noEmit` passes with zero errors, all components type-check cleanly.
+
+### Phase T3: Page Integration
+
+- [x] **Step T3.1:** Add `CircleHelp` icon button in `AppSidebar.tsx` footer → opens `GuideListSheet`. Add i18n key `"app.sidebar.help"`.
+- [x] **Step T3.2:** Add help access in `BottomNav.tsx` for mobile → opens `GuideListSheet`.
+- [x] **Step T3.3:** Add "How to export from Snapchat?" link in `DownloaderPlaceholder.tsx` → opens `snapchat-export` guide.
+- [x] **Step T3.4:** Add help button in `ViewerPlaceholder.tsx` header → opens `viewer-usage` guide.
+- [x] **Step T3.5:** Add `HelpTooltip` next to complex settings in `SettingsForm.tsx` (video profile, image format, RPM, HW accel, thumbnail quality).
+- [x] **Step T3.6:** Add first-time onboarding in `App.tsx` — check `localStorage("onboarding-complete")`, auto-open `first-time-setup` guide. Add "Show setup guide" in Settings.
+- [x] **Verification:** All entry points wired. `tsc --noEmit` passes with zero errors.
+
+### Phase T4: i18n Keys for UI Chrome
+
+- [x] **Step T4.1:** Add all new UI string keys to both `enMessages` and `deMessages` in `i18n-messages.ts`: guide dialog buttons, page indicator, sheet title, help tooltip texts, contextual link labels.
+- [x] **Verification:** Switch en/de → all new strings translate correctly. **Status:** ✅ VERIFIED — 17 new keys added (en + de), tsc passes.
+
+### Phase T5: Placeholder Tutorial Images
+
+- [x] **Step T5.1:** Add placeholder SVG images to `public/tutorials/<guide-id>/` directories for each guide step (15 total). Updated JSON refs from `.webp` to `.svg`.
+- [x] **Verification:** `tsc --noEmit` and `vite build` both succeed. Images load in guide dialogs.

@@ -1,0 +1,58 @@
+{
+  "id": "first-time-setup",
+  "icon": "Rocket",
+  "title": {
+    "en": "Welcome to MemorySnaper",
+    "de": "Willkommen bei MemorySnaper"
+  },
+  "description": {
+    "en": "Quick setup walkthrough to get started with your Snapchat memory vault.",
+    "de": "Kurze Einrichtungsanleitung für deinen Snapchat-Erinnerungstresor."
+  },
+  "pages": [
+    {
+      "image": "/tutorials/first-time-setup/step1.svg",
+      "title": {
+        "en": "What is MemorySnaper?",
+        "de": "Was ist MemorySnaper?"
+      },
+      "body": {
+        "en": "MemorySnaper extracts and organizes your Snapchat Memories from the official data export. Everything stays 100% local on your computer — nothing is uploaded anywhere.",
+        "de": "MemorySnaper extrahiert und organisiert deine Snapchat-Erinnerungen aus dem offiziellen Datenexport. Alles bleibt zu 100% lokal auf deinem Computer — nichts wird irgendwohin hochgeladen."
+      }
+    },
+    {
+      "image": "/tutorials/first-time-setup/step2.svg",
+      "title": {
+        "en": "Step 1: Get Your Export",
+        "de": "Schritt 1: Export holen"
+      },
+      "body": {
+        "en": "First, request your data export from Snapchat (Settings → My Data → Submit Request). Once ready, download the ZIP files to your computer. Check the 'How to Export' guide for detailed steps.",
+        "de": "Fordere zuerst deinen Datenexport bei Snapchat an (Einstellungen → Meine Daten → Anfrage senden). Lade die ZIP-Dateien herunter, sobald sie bereit sind. Schau dir die Anleitung 'So exportierst du' für detaillierte Schritte an."
+      }
+    },
+    {
+      "image": "/tutorials/first-time-setup/step3.svg",
+      "title": {
+        "en": "Step 2: Extract",
+        "de": "Schritt 2: Extrahieren"
+      },
+      "body": {
+        "en": "Go to the Extractor tab, select your ZIP files, and start the extraction. The app finds your memories in the archives, removes duplicates, and organizes them into folders by date.",
+        "de": "Gehe zum Extraktor-Tab, wähle deine ZIP-Dateien aus und starte die Extraktion. Die App findet deine Erinnerungen in den Archiven, entfernt Duplikate und sortiert sie nach Datum in Ordner."
+      }
+    },
+    {
+      "image": "/tutorials/first-time-setup/step4.svg",
+      "title": {
+        "en": "Step 3: Browse & Enjoy",
+        "de": "Schritt 3: Durchstöbern & Genießen"
+      },
+      "body": {
+        "en": "Switch to the Viewer tab to browse your memories. Filter by date, type, or location. Click any thumbnail to view full-screen. Your memories are yours — forever.",
+        "de": "Wechsle zum Betrachter-Tab, um deine Erinnerungen zu durchstöbern. Filtere nach Datum, Typ oder Standort. Klicke auf ein Vorschaubild für die Vollbildansicht. Deine Erinnerungen gehören dir — für immer."
+      }
+    }
+  ]
+}

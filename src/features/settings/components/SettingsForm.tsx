@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTheme } from "next-themes";
 import { save, open } from "@tauri-apps/plugin-dialog";
-import { Loader2, Monitor, Moon, Sun, FolderOpen, RotateCcw } from "lucide-react";
+import { Loader2, Monitor, Moon, Sun, FolderOpen, RotateCcw, BookOpen } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -60,6 +60,9 @@ import {
   setExportPath,
 } from "@/lib/memories-api";
 import { cn } from "@/lib/utils";
+import { HelpTooltip } from "@/components/HelpTooltip";
+import { GuideDialog } from "@/components/GuideDialog";
+import { getGuideById } from "@/data/guides/index";
 
 const REQUESTS_WARNING_THRESHOLD = 100;
 const CONCURRENCY_WARNING_THRESHOLD = 5;
@@ -179,6 +182,8 @@ export function SettingsForm() {
   const [currentExportPath, setCurrentExportPath] = useState<string>("");
   const [defaultExportPath, setDefaultExportPath] = useState<string>("");
   const [isChangingExportPath, setIsChangingExportPath] = useState(false);
+  const [setupGuideOpen, setSetupGuideOpen] = useState(false);
+  const setupGuide = getGuideById("first-time-setup") ?? null;
 
   useEffect(() => {
     const settings = readAppSettings();
@@ -487,7 +492,10 @@ export function SettingsForm() {
       {/* ── Processing ── */}
       <TabsContent value="processing" className="space-y-6 pt-4 pb-8">
         <div className="space-y-2">
-          <Label htmlFor="requests-per-minute">{t("settings.form.requestsPerMinute")}</Label>
+          <div className="flex items-center gap-1.5">
+            <Label htmlFor="requests-per-minute">{t("settings.form.requestsPerMinute")}</Label>
+            <HelpTooltip helpKey="help.settings.requestsPerMinute" />
+          </div>
           <Input
             id="requests-per-minute"
             type="number"
@@ -516,7 +524,10 @@ export function SettingsForm() {
       {/* ── Media Output ── */}
       <TabsContent value="media" className="space-y-6 pt-4 pb-8">
         <div className="space-y-2">
-          <Label>{t("settings.form.thumbnailQuality")}</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>{t("settings.form.thumbnailQuality")}</Label>
+            <HelpTooltip helpKey="help.settings.thumbnailQuality" />
+          </div>
           <Select
             value={thumbnailQuality}
             onValueChange={(value) => { setThumbnailQuality(parseThumbnailQualityPreference(value)); }}
@@ -535,7 +546,10 @@ export function SettingsForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>{t("settings.form.videoProfile")}</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>{t("settings.form.videoProfile")}</Label>
+            <HelpTooltip helpKey="help.settings.videoProfile" />
+          </div>
           <Select
             value={videoProfile}
             onValueChange={(value) => { setVideoProfile(parseVideoProfilePreference(value)); }}
@@ -554,7 +568,10 @@ export function SettingsForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>{t("settings.form.imageFormat")}</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>{t("settings.form.imageFormat")}</Label>
+            <HelpTooltip helpKey="help.settings.imageFormat" />
+          </div>
           <Select
             value={imageOutputFormat}
             onValueChange={(value) => { setImageOutputFormat(parseImageOutputFormatPreference(value)); }}
@@ -613,7 +630,10 @@ export function SettingsForm() {
         </div>
 
         <div className="space-y-2">
-          <Label>{t("settings.form.videoHardwareAcceleration")}</Label>
+          <div className="flex items-center gap-1.5">
+            <Label>{t("settings.form.videoHardwareAcceleration")}</Label>
+            <HelpTooltip helpKey="help.settings.hwAcceleration" />
+          </div>
           <Select
             value={videoHardwareAcceleration}
             onValueChange={(value) => { setVideoHardwareAcceleration(value as HardwareAccelerationPreference); }}
@@ -721,6 +741,22 @@ export function SettingsForm() {
           <p className="text-xs text-muted-foreground">{t("settings.form.viewerExport.description")}</p>
 
 
+        </div>
+
+        <Separator />
+
+        {/* Setup Guide */}
+        <div className="space-y-3">
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full gap-1.5"
+            onClick={() => setSetupGuideOpen(true)}
+          >
+            <BookOpen className="h-4 w-4" />
+            {t("settings.data.showSetupGuide")}
+          </Button>
+          <GuideDialog guide={setupGuide} open={setupGuideOpen} onOpenChange={setSetupGuideOpen} />
         </div>
 
         <Separator />

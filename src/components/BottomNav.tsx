@@ -1,8 +1,10 @@
-import { Download, Images, Settings } from "lucide-react";
+import { useState } from "react";
+import { Download, Images, Settings, CircleHelp } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { useI18n } from "@/lib/i18n";
 import type { TabKey } from "@/components/AppSidebar";
+import { GuideListSheet } from "@/components/GuideListSheet";
 
 interface BottomNavProps {
   activeTab: TabKey;
@@ -20,6 +22,7 @@ const NAV_ITEMS: Array<{
 
 export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
   const { t } = useI18n();
+  const [helpOpen, setHelpOpen] = useState(false);
 
   const labels: Record<TabKey, string> = {
     downloader: t("app.tabs.downloader"),
@@ -59,7 +62,18 @@ export function BottomNav({ activeTab, onTabChange }: BottomNavProps) {
             </button>
           );
         })}
+        <button
+          type="button"
+          onClick={() => setHelpOpen(true)}
+          className="flex flex-1 flex-col items-center gap-0.5 rounded-lg py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <div className="flex h-8 w-12 items-center justify-center rounded-full">
+            <CircleHelp className="size-5" />
+          </div>
+          <span>{t("app.sidebar.help")}</span>
+        </button>
       </div>
+      <GuideListSheet open={helpOpen} onOpenChange={setHelpOpen} />
     </nav>
   );
 }

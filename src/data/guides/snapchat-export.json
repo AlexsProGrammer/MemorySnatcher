@@ -1,0 +1,69 @@
+{
+  "id": "snapchat-export",
+  "icon": "Download",
+  "title": {
+    "en": "How to Export Your Snapchat Data",
+    "de": "So exportierst du deine Snapchat-Daten"
+  },
+  "description": {
+    "en": "Step-by-step guide to request and download your Snapchat memories ZIP export.",
+    "de": "Schritt-für-Schritt-Anleitung zum Anfordern und Herunterladen deines Snapchat-Erinnerungen-ZIP-Exports."
+  },
+  "relatedPage": "downloader",
+  "pages": [
+    {
+      "image": "/tutorials/snapchat-export/step1.svg",
+      "title": {
+        "en": "Open Snapchat Settings",
+        "de": "Snapchat-Einstellungen öffnen"
+      },
+      "body": {
+        "en": "Open Snapchat on your phone. Tap your profile icon (top-left), then tap the gear icon (top-right) to open Settings.",
+        "de": "Öffne Snapchat auf deinem Handy. Tippe auf dein Profilbild (oben links), dann auf das Zahnrad-Symbol (oben rechts), um die Einstellungen zu öffnen."
+      }
+    },
+    {
+      "image": "/tutorials/snapchat-export/step2.svg",
+      "title": {
+        "en": "Go to 'My Data'",
+        "de": "'Meine Daten' aufrufen"
+      },
+      "body": {
+        "en": "Scroll down in Settings and tap 'My Data' under the 'Privacy Controls' section.",
+        "de": "Scrolle in den Einstellungen nach unten und tippe unter 'Datenschutz' auf 'Meine Daten'."
+      }
+    },
+    {
+      "image": "/tutorials/snapchat-export/step3.svg",
+      "title": {
+        "en": "Request Your Data Export",
+        "de": "Datenexport anfordern"
+      },
+      "body": {
+        "en": "On the 'My Data' page, scroll to the bottom and tap 'Submit Request'. Snapchat will prepare your data export — this can take a few hours to several days.",
+        "de": "Scrolle auf der Seite 'Meine Daten' ganz nach unten und tippe auf 'Anfrage senden'. Snapchat bereitet deinen Datenexport vor — das kann einige Stunden bis mehrere Tage dauern."
+      }
+    },
+    {
+      "image": "/tutorials/snapchat-export/step4.svg",
+      "title": {
+        "en": "Download the ZIP Files",
+        "de": "ZIP-Dateien herunterladen"
+      },
+      "body": {
+        "en": "Once ready, you'll receive an email from Snapchat with a download link. Download all ZIP files (the main 'mydata~<id>' file and any numbered parts). Save them to your computer.",
+        "de": "Sobald der Export fertig ist, erhältst du eine E-Mail von Snapchat mit einem Download-Link. Lade alle ZIP-Dateien herunter (die Hauptdatei 'mydata~<id>' und eventuelle nummerierte Teile). Speichere sie auf deinem Computer."
+      }
+    },
+    {
+      "title": {
+        "en": "Ready to Extract!",
+        "de": "Bereit zum Extrahieren!"
+      },
+      "body": {
+        "en": "Now open MemorySnaper, go to the Extractor tab, and select the ZIP files you just downloaded. The app will handle the rest!",
+        "de": "Öffne jetzt MemorySnaper, gehe zum Extraktor-Tab und wähle die heruntergeladenen ZIP-Dateien aus. Die App erledigt den Rest!"
+      }
+    }
+  ]
+}

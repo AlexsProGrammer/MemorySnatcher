@@ -1,7 +1,7 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { Download, FolderOpen, ImageIcon } from "lucide-react";
+import { Download, FolderOpen, ImageIcon, CircleHelp } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -31,6 +31,8 @@ import {
   getViewerItems,
   type ViewerMediaKind,
 } from "@/lib/memories-api";
+import { GuideDialog } from "@/components/GuideDialog";
+import { getGuideById } from "@/data/guides/index";
 
 type GridItem = {
   id: string;
@@ -68,6 +70,8 @@ export function ViewerPlaceholder() {
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const viewerGuide = getGuideById("viewer-usage") ?? null;
 
   const filterMeta = useMemo(() => extractFilterMeta(items), [items]);
   const filteredItems = useMemo(() => applyViewerFilters(items, filterState), [items, filterState]);
@@ -359,6 +363,15 @@ export function ViewerPlaceholder() {
         <div className="flex items-center gap-2">
           <Button
             type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            onClick={() => setGuideOpen(true)}
+          >
+            <CircleHelp className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            type="button"
             variant="outline"
             size="sm"
             onClick={() => { void onOpenMediaFolder(); }}
@@ -422,6 +435,7 @@ export function ViewerPlaceholder() {
         onPrevious={goPrevious}
         onNext={goNext}
       />
+      <GuideDialog guide={viewerGuide} open={guideOpen} onOpenChange={setGuideOpen} />
     </div>
   );
 }
