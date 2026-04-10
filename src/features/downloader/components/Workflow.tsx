@@ -428,6 +428,7 @@ export function Workflow() {
     (selectedZipPaths.length > 0 || jobId !== null || finishedZipFiles.length > 0 || logLines.length > 0) &&
     (!isWorking || isStopped);
   const isViewerImportBlockedByZipSelection = selectedZipPaths.length > 0;
+  const areTopWorkflowSectionsDisabled = isWorking || isImportingViewerArchive;
 
   type ZipSelection = {
     uuid: string;
@@ -800,7 +801,12 @@ export function Workflow() {
   return (
     <div className="space-y-5">
       {/* ── Path A: Returning user ── */}
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div
+        className={`rounded-xl border bg-card overflow-hidden ${
+          areTopWorkflowSectionsDisabled ? "pointer-events-none opacity-60" : ""
+        }`}
+        aria-disabled={areTopWorkflowSectionsDisabled}
+      >
         <div className="flex items-start gap-4 p-5">
           <div className="mt-0.5 shrink-0 rounded-lg bg-emerald-500/10 p-2.5">
             <Archive className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -853,7 +859,12 @@ export function Workflow() {
       </div>
 
       {/* ── Path B: New user ── */}
-      <div className="rounded-xl border bg-card overflow-hidden">
+      <div
+        className={`rounded-xl border bg-card overflow-hidden ${
+          areTopWorkflowSectionsDisabled ? "pointer-events-none opacity-60" : ""
+        }`}
+        aria-disabled={areTopWorkflowSectionsDisabled}
+      >
         <div className="flex items-start gap-4 p-5">
           <div className="mt-0.5 shrink-0 rounded-lg bg-primary/10 p-2.5">
             <PackageOpen className="h-5 w-5 text-primary" />
@@ -875,7 +886,7 @@ export function Workflow() {
             selectedZipPaths={selectedZipPaths}
             validationState={validationState}
             validationMessage={validationMessage}
-            isWorking={isWorking}
+            isWorking={areTopWorkflowSectionsDisabled}
             onPickZipFiles={() => { void onPickZipFiles(); }}
             onRemoveSelection={onRemoveSelection}
             extractFileNameFromPath={extractFileNameFromPath}

@@ -134,14 +134,14 @@ export function ProgressOverview({
           variant="muted"
         />
         <StatCard
-          icon={<PackageCheck className="h-4 w-4" />}
-          label={t("downloader.progress.stat.downloaded")}
-          value={`${completedDownloaded} / ${effectiveTotal}`}
-        />
-        <StatCard
           icon={<Cog className="h-4 w-4" />}
           label={t("downloader.progress.stat.processed")}
           value={`${completedProcessed} / ${effectiveTotal}`}
+        />
+        <StatCard
+          icon={<PackageCheck className="h-4 w-4" />}
+          label={t("downloader.progress.stat.downloaded")}
+          value={`${completedDownloaded} / ${effectiveTotal}`}
           variant="success"
         />
         <StatCard

@@ -34,33 +34,57 @@ export function StorageBar({ exportPath, zipPaths, onEstimatedBytesChange }: Sto
   const { t } = useI18n();
   const [diskSpace, setDiskSpace] = useState<DiskSpaceInfo | null>(null);
   const [totalZipBytes, setTotalZipBytes] = useState<number>(0);
+  const prevEstimated = useRef(0);
 
-  // Serialise zipPaths into a stable key so the effect re-runs on selection changes
+  // Serialize zipPaths into a stable key so the effect re-runs on selection changes.
   const zipKey = zipPaths.join("\n");
 
   useEffect(() => {
-    if (!exportPath || zipPaths.length === 0) return;
+    if (!exportPath || zipPaths.length === 0) {
+      setDiskSpace(null);
+      setTotalZipBytes(0);
+      return;
+    }
+
     let cancelled = false;
-    void Promise.all([
-      getDiskSpace(exportPath),
-      getFilesTotalSize(zipPaths),
-    ]).then(([space, size]) => {
-      if (cancelled) return;
-      setDiskSpace(space);
-      setTotalZipBytes(size);
-    });
-    return () => { cancelled = true; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
+    const loadStorageInfo = async () => {
+      try {
+        const [space, size] = await Promise.all([
+          getDiskSpace(exportPath),
+          getFilesTotalSize(zipPaths),
+        ]);
+
+        if (!cancelled) {
+          setDiskSpace(space);
+          setTotalZipBytes(size);
+        }
+      } catch (error) {
+        // Keep the UI alive even if platform-specific FS probes fail.
+        console.error("[downloader] Failed to load storage estimate", error);
+        if (!cancelled) {
+          setDiskSpace(null);
+          setTotalZipBytes(0);
+        }
+      }
+    };
+
+    void loadStorageInfo();
+
+    return () => {
+      cancelled = true;
+    };
   }, [exportPath, zipKey]);
 
-  if (!diskSpace || zipPaths.length === 0 || totalZipBytes === 0) return null;
+  if (!diskSpace || zipPaths.length === 0 || totalZipBytes === 0) {
+    return null;
+  }
 
   const { totalBytes, freeBytes } = diskSpace;
   const usedBytes = totalBytes - freeBytes;
   const estimatedBytes = estimateRequiredBytes(totalZipBytes);
 
-  // Notify parent of the estimated size for disclaimer display
-  const prevEstimated = useRef(0);
+  // Notify parent of estimated size for disclaimer display (post-render).
   if (estimatedBytes !== prevEstimated.current) {
     prevEstimated.current = estimatedBytes;
     onEstimatedBytesChange?.(estimatedBytes);

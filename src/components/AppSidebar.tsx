@@ -99,7 +99,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarTrigger className="w-full justify-start" />
+            <SidebarTrigger className="w-full justify-start p-2" />
           </SidebarMenuItem>
         </SidebarMenu>
         <GuideListSheet open={helpOpen} onOpenChange={setHelpOpen} />
