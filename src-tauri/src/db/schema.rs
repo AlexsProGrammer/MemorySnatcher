@@ -115,5 +115,13 @@ pub fn sqlite_migrations() -> Vec<Migration> {
             ",
             kind: MigrationKind::Up,
         },
+        Migration {
+            version: 10,
+            description: "add_memory_item_media_download_url",
+            sql: "
+                ALTER TABLE MemoryItem ADD COLUMN media_download_url TEXT;
+            ",
+            kind: MigrationKind::Up,
+        },
     ]
 }

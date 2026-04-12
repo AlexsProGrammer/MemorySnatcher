@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   PackageCheck,
   Cog,
+  Download,
 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +28,8 @@ type ProgressOverviewProps = {
   totalFiles: number;
   processedFiles: number;
   downloadedFiles: number;
+  missingFiles: number;
+  missingDownloadTarget: number;
   duplicatesSkipped: number;
   downloadProgress: RuntimeProgress | null;
   processProgress: RuntimeProgress | null;
@@ -90,6 +93,8 @@ export function ProgressOverview({
   totalFiles,
   processedFiles,
   downloadedFiles,
+  missingFiles,
+  missingDownloadTarget,
   duplicatesSkipped,
   downloadProgress,
   processProgress,
@@ -103,8 +108,12 @@ export function ProgressOverview({
   const effectiveTotal = Math.max(0, totalFiles - duplicatesSkipped);
 
   const completedProcessed = processProgress?.successfulFiles ?? processedFiles;
-  const completedDownloaded = downloadProgress?.successfulFiles ?? downloadedFiles;
+  const completedDownloaded = downloadedFiles;
   const failedFiles = (downloadProgress?.failedFiles ?? 0) + (processProgress?.failedFiles ?? 0);
+  const isDownloadingMissing =
+    downloadProgress !== null
+    && downloadProgress.totalFiles > 0
+    && downloadProgress.completedFiles < downloadProgress.totalFiles;
 
   const sessionBadge = statusToBadgeVariant(importState, isPaused, isStopped);
 
@@ -126,7 +135,7 @@ export function ProgressOverview({
 
       <Progress value={progressValue} className="h-2.5" />
 
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
         <StatCard
           icon={<Files className="h-4 w-4" />}
           label={t("downloader.progress.stat.total")}
@@ -143,6 +152,14 @@ export function ProgressOverview({
           label={t("downloader.progress.stat.downloaded")}
           value={`${completedDownloaded} / ${effectiveTotal}`}
           variant="success"
+        />
+        <StatCard
+          icon={<Download className="h-4 w-4" />}
+          label={isDownloadingMissing ? "Downloading" : "Missing files"}
+          value={isDownloadingMissing
+            ? `${downloadProgress?.successfulFiles ?? 0} / ${Math.max(missingDownloadTarget, 1)}`
+            : missingFiles}
+          variant={isDownloadingMissing ? "warning" : "muted"}
         />
         <StatCard
           icon={<CopySlash className="h-4 w-4" />}

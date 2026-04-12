@@ -161,7 +161,8 @@ pub async fn merge_media_with_optional_overlay(
                 let media_kind = media_kind_from_path(&base_media_path)
                     .ok_or_else(|| MediaError::UnsupportedMediaType(base_media_path.clone()))?;
 
-                let ffmpeg_output_path = temporary_output_path_with_suffix(&output_path, "overlay.tmp")?;
+                let ffmpeg_output_path =
+                    temporary_output_path_with_suffix(&output_path, "overlay.tmp")?;
 
                 let args = build_ffmpeg_overlay_args(
                     &base_media_path,
@@ -177,41 +178,37 @@ pub async fn merge_media_with_optional_overlay(
                 Ok(())
             }
             None => {
-                    let media_kind = media_kind_from_path(&base_media_path)
-                        .ok_or_else(|| MediaError::UnsupportedMediaType(base_media_path.clone()))?;
+                let media_kind = media_kind_from_path(&base_media_path)
+                    .ok_or_else(|| MediaError::UnsupportedMediaType(base_media_path.clone()))?;
 
-                    match media_kind {
-                        MediaKind::Image => {
-                            let ffmpeg_output_path = temporary_output_path_with_suffix(
-                                &output_path,
-                                "image.tmp",
-                            )?;
-                            let args = build_ffmpeg_image_transcode_args(
-                                &base_media_path,
-                                &ffmpeg_output_path,
-                                encoding_options,
-                            );
-                            run_ffmpeg(args)?;
-                            std::fs::rename(&ffmpeg_output_path, &output_path)?;
-                            Ok(())
-                        }
-                        MediaKind::Video => {
-                            let ffmpeg_output_path = temporary_output_path_with_suffix(
-                                &output_path,
-                                "normalize.tmp",
-                            )?;
-
-                            let args = build_ffmpeg_video_normalize_args(
-                                &base_media_path,
-                                &ffmpeg_output_path,
-                                encoding_options.video_profile,
-                            );
-                            run_ffmpeg(args)?;
-                            std::fs::rename(&ffmpeg_output_path, &output_path)?;
-
-                            Ok(())
-                        }
+                match media_kind {
+                    MediaKind::Image => {
+                        let ffmpeg_output_path =
+                            temporary_output_path_with_suffix(&output_path, "image.tmp")?;
+                        let args = build_ffmpeg_image_transcode_args(
+                            &base_media_path,
+                            &ffmpeg_output_path,
+                            encoding_options,
+                        );
+                        run_ffmpeg(args)?;
+                        std::fs::rename(&ffmpeg_output_path, &output_path)?;
+                        Ok(())
                     }
+                    MediaKind::Video => {
+                        let ffmpeg_output_path =
+                            temporary_output_path_with_suffix(&output_path, "normalize.tmp")?;
+
+                        let args = build_ffmpeg_video_normalize_args(
+                            &base_media_path,
+                            &ffmpeg_output_path,
+                            encoding_options.video_profile,
+                        );
+                        run_ffmpeg(args)?;
+                        std::fs::rename(&ffmpeg_output_path, &output_path)?;
+
+                        Ok(())
+                    }
+                }
             }
         }
     })
@@ -300,10 +297,7 @@ fn run_ffmpeg(args: Vec<String>) -> Result<(), MediaError> {
             .collect();
 
         if !warnings.is_empty() {
-            eprintln!(
-                "[ffmpeg] completed with {} warning(s):",
-                warnings.len()
-            );
+            eprintln!("[ffmpeg] completed with {} warning(s):", warnings.len());
             for warning in warnings {
                 eprintln!("[ffmpeg]   {}", warning.trim());
             }
@@ -675,7 +669,10 @@ fn temporary_output_path(media_path: &Path) -> Result<PathBuf, MediaError> {
     temporary_output_path_with_suffix(media_path, "metadata.tmp")
 }
 
-fn temporary_output_path_with_suffix(media_path: &Path, suffix: &str) -> Result<PathBuf, MediaError> {
+fn temporary_output_path_with_suffix(
+    media_path: &Path,
+    suffix: &str,
+) -> Result<PathBuf, MediaError> {
     let stem = media_path
         .file_stem()
         .and_then(|value| value.to_str())
@@ -766,10 +763,14 @@ pub async fn verify_video_integrity(
     tokio::task::spawn_blocking(move || {
         let output = Command::new("ffprobe")
             .args([
-                "-v", "error",
-                "-select_streams", "v:0",
-                "-show_entries", "stream=codec_name,pix_fmt,width,height",
-                "-of", "csv=p=0",
+                "-v",
+                "error",
+                "-select_streams",
+                "v:0",
+                "-show_entries",
+                "stream=codec_name,pix_fmt,width,height",
+                "-of",
+                "csv=p=0",
             ])
             .arg(&video_path)
             .output()
@@ -865,7 +866,10 @@ mod tests {
             media_kind_from_path(Path::new("memory.mov")),
             Some(MediaKind::Video)
         );
-        assert_eq!(media_kind_from_path(Path::new("memory.webm")), Some(MediaKind::Video));
+        assert_eq!(
+            media_kind_from_path(Path::new("memory.webm")),
+            Some(MediaKind::Video)
+        );
     }
 
     #[test]

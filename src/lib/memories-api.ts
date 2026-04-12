@@ -6,6 +6,7 @@ export type DownloadErrorCode =
   | "HTTP_ERROR"
   | "IO_ERROR"
   | "CONCURRENCY_ERROR"
+  | "STOPPED"
   | "INTERNAL_ERROR";
 
 export type ProcessErrorCode =
@@ -38,6 +39,17 @@ export type ExportJobState = {
 export type ProcessMemoriesResult = {
   processedCount: number;
   failedCount: number;
+  missingCount: number;
+};
+
+export type MissingFileItem = {
+  memoryGroupId: number;
+  memoryItemId: number;
+  dateTaken: string;
+  mid?: string;
+  location?: string;
+  mediaDownloadUrl: string;
+  lastErrorMessage?: string;
 };
 
 export type ProcessProgressPayload = {
@@ -90,6 +102,7 @@ export type ProcessingSessionOverview = {
   totalFiles: number;
   downloadedFiles: number;
   processedFiles: number;
+  missingFiles: number;
   duplicatesSkipped: number;
   isPaused: boolean;
   isStopped: boolean;
@@ -171,6 +184,18 @@ export async function resumeProcessingSession(): Promise<void> {
 
 export async function getProcessingSessionOverview(): Promise<ProcessingSessionOverview> {
   return invoke<ProcessingSessionOverview>("get_processing_session_overview");
+}
+
+export async function getMissingFiles(): Promise<MissingFileItem[]> {
+  return invoke<MissingFileItem[]>("get_missing_files");
+}
+
+export async function getMissingFileByMemoryItemId(
+  memoryItemId: number,
+): Promise<MissingFileItem | null> {
+  return invoke<MissingFileItem | null>("get_missing_file_by_memory_item_id", {
+    memoryItemId,
+  });
 }
 
 export async function downloadQueuedMemories(

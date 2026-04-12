@@ -27,7 +27,12 @@ impl Display for ProcessorError {
             Self::Database(error) => write!(f, "processor DB error: {error}"),
             Self::InvalidInput(reason) => write!(f, "invalid processor input: {reason}"),
             Self::FfmpegFailed { status, stderr } => {
-                write!(f, "ffmpeg exited with status {:?}: {}", status, stderr.trim())
+                write!(
+                    f,
+                    "ffmpeg exited with status {:?}: {}",
+                    status,
+                    stderr.trim()
+                )
             }
             Self::Blake3(msg) => write!(f, "blake3 hashing failed: {msg}"),
         }
@@ -169,10 +174,7 @@ pub async fn process_media(input: ProcessMediaInput) -> Result<ProcessMediaResul
         input.memory_item_id,
         output_extension,
     )?;
-    let thumbnail_path = build_thumbnail_path(
-        &input.thumbnail_dir,
-        input.memory_item_id,
-    );
+    let thumbnail_path = build_thumbnail_path(&input.thumbnail_dir, input.memory_item_id);
 
     if let Some(parent) = final_media_path.parent() {
         tokio::fs::create_dir_all(parent).await?;
@@ -184,9 +186,10 @@ pub async fn process_media(input: ProcessMediaInput) -> Result<ProcessMediaResul
     let mut temp_concat_path: Option<PathBuf> = None;
 
     if input.raw_media_paths.len() > 1 && source_is_video {
-        let concat_output_path = input
-            .export_dir
-            .join(format!("{}.concat.{}", input.memory_item_id, source_extension));
+        let concat_output_path = input.export_dir.join(format!(
+            "{}.concat.{}",
+            input.memory_item_id, source_extension
+        ));
 
         eprintln!(
             "[processor-debug] concatenating parts memory_item_id={} parts={} concat_output='{}'",
@@ -219,15 +222,15 @@ pub async fn process_media(input: ProcessMediaInput) -> Result<ProcessMediaResul
     // Post-transcode integrity check for videos: verify codec and pixel format.
     // If the chosen profile produces a broken output, retry with Mp4Compatible.
     let final_media_path = if source_is_video {
-        let is_valid = media::verify_video_integrity(
-            &final_media_path,
-            input.video_output_profile,
-        )
-        .await
-        .unwrap_or(false);
+        let is_valid = media::verify_video_integrity(&final_media_path, input.video_output_profile)
+            .await
+            .unwrap_or(false);
 
         if !is_valid
-            && !matches!(input.video_output_profile, media::VideoOutputProfile::Mp4Compatible)
+            && !matches!(
+                input.video_output_profile,
+                media::VideoOutputProfile::Mp4Compatible
+            )
         {
             eprintln!(
                 "[processor-debug] integrity check failed for memory_item_id={}, retrying with Mp4Compatible",
@@ -302,21 +305,18 @@ pub async fn check_duplicate_in_db(
 ) -> Result<bool, ProcessorError> {
     let pool = SqlitePool::connect(database_url).await?;
 
-    let duplicate_id: Option<i64> = sqlx::query_scalar(
-        "SELECT id FROM Memories WHERE content_hash = ?1 AND id != ?2 LIMIT 1",
-    )
-    .bind(content_hash)
-    .bind(memory_group_id)
-    .fetch_optional(&pool)
-    .await?;
+    let duplicate_id: Option<i64> =
+        sqlx::query_scalar("SELECT id FROM Memories WHERE content_hash = ?1 AND id != ?2 LIMIT 1")
+            .bind(content_hash)
+            .bind(memory_group_id)
+            .fetch_optional(&pool)
+            .await?;
 
     if duplicate_id.is_some() {
-        sqlx::query(
-            "UPDATE Memories SET status = 'DUPLICATE' WHERE id = ?1",
-        )
-        .bind(memory_group_id)
-        .execute(&pool)
-        .await?;
+        sqlx::query("UPDATE Memories SET status = 'DUPLICATE' WHERE id = ?1")
+            .bind(memory_group_id)
+            .execute(&pool)
+            .await?;
 
         return Ok(true);
     }
@@ -384,7 +384,9 @@ fn parse_capture_date(date_taken: &str) -> Result<NaiveDate, ProcessorError> {
         return Ok(date_time.date());
     }
 
-    Err(ProcessorError::InvalidInput("date_taken is not a supported date format"))
+    Err(ProcessorError::InvalidInput(
+        "date_taken is not a supported date format",
+    ))
 }
 
 async fn merge_staged_media(
@@ -490,8 +492,7 @@ async fn concat_video_parts(parts: &[PathBuf], output_path: &Path) -> Result<(),
 }
 
 fn escape_ffmpeg_concat_entry_path(path: &Path) -> String {
-    path
-        .to_string_lossy()
+    path.to_string_lossy()
         .replace('\\', "/")
         .replace('\'', "'\\''")
 }
@@ -605,7 +606,8 @@ async fn cleanup_source_artifacts(
 }
 
 fn is_staging_path(path: &Path) -> bool {
-    path.components().any(|component| component.as_os_str() == ".staging")
+    path.components()
+        .any(|component| component.as_os_str() == ".staging")
 }
 
 async fn remove_empty_staging_dirs(path: &Path) -> Result<(), ProcessorError> {
@@ -645,7 +647,7 @@ fn is_video_extension(extension: &str) -> bool {
 mod tests {
     use super::*;
     use std::io::Write;
-    use tempfile::{NamedTempFile, tempdir};
+    use tempfile::{tempdir, NamedTempFile};
 
     #[tokio::test]
     async fn blake3_same_content_produces_same_hash() {
@@ -670,7 +672,10 @@ mod tests {
         let hash_a = compute_blake3_hash(file_a.path()).await.unwrap();
         let hash_b = compute_blake3_hash(file_b.path()).await.unwrap();
 
-        assert_ne!(hash_a, hash_b, "different content must yield different hashes");
+        assert_ne!(
+            hash_a, hash_b,
+            "different content must yield different hashes"
+        );
     }
 
     #[tokio::test]
@@ -690,7 +695,10 @@ mod tests {
     #[tokio::test]
     async fn blake3_missing_file_returns_error() {
         let result = compute_blake3_hash(Path::new("/nonexistent/path/file.mp4")).await;
-        assert!(result.is_err(), "hashing a missing file must return an error");
+        assert!(
+            result.is_err(),
+            "hashing a missing file must return an error"
+        );
         assert!(matches!(result.unwrap_err(), ProcessorError::Blake3(_)));
     }
 
@@ -732,7 +740,10 @@ mod tests {
             .unwrap();
 
         let is_duplicate = check_duplicate_in_db(hash, 1, &database_url).await.unwrap();
-        assert!(is_duplicate, "must return true when a matching hash already exists");
+        assert!(
+            is_duplicate,
+            "must return true when a matching hash already exists"
+        );
 
         let status: String = sqlx::query_scalar("SELECT status FROM Memories WHERE id = 1")
             .fetch_one(&pool)
@@ -802,8 +813,8 @@ mod tests {
                 image_quality: media::ImageQuality::Full,
             },
         )
-            .await
-            .unwrap();
+        .await
+        .unwrap();
 
         assert!(output_path.exists());
     }
@@ -811,7 +822,9 @@ mod tests {
     #[test]
     fn detects_staging_paths() {
         assert!(is_staging_path(Path::new("/tmp/export/.staging/42.jpg")));
-        assert!(!is_staging_path(Path::new("/tmp/export/2026/02_February/42.jpg")));
+        assert!(!is_staging_path(Path::new(
+            "/tmp/export/2026/02_February/42.jpg"
+        )));
     }
 
     #[tokio::test]

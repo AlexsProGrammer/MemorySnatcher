@@ -59,7 +59,10 @@ impl Display for ZipHunterError {
             Self::Join(error) => write!(f, "zip hunter worker failed: {error}"),
             Self::Http(error) => write!(f, "zip hunter network request failed: {error}"),
             Self::HttpStatus(status) => {
-                write!(f, "zip hunter fallback download failed with HTTP status {status}")
+                write!(
+                    f,
+                    "zip hunter fallback download failed with HTTP status {status}"
+                )
             }
             Self::Database(error) => write!(f, "zip hunter database update failed: {error}"),
             Self::InvalidInput(reason) => write!(f, "invalid zip hunter input: {reason}"),
@@ -134,8 +137,11 @@ pub async fn find_and_extract_memory(
         tokio::task::spawn_blocking(move || {
             let (entries, main_entry, overlay_entry) =
                 scan_zip_archives(&zip_paths, &scan_date, &scan_mid)?;
-            let (staging_dir, staged_main_path, staged_overlay_path) =
-                stage_matched_entries(&scan_zip_paths, main_entry.as_ref(), overlay_entry.as_ref())?;
+            let (staging_dir, staged_main_path, staged_overlay_path) = stage_matched_entries(
+                &scan_zip_paths,
+                main_entry.as_ref(),
+                overlay_entry.as_ref(),
+            )?;
 
             Ok::<_, ZipHunterError>((
                 entries,
@@ -161,12 +167,12 @@ pub async fn find_and_extract_memory(
     };
 
     if scan.staged_main_path.is_none() {
-        let fallback_url = media_download_url
+        let Some(fallback_url) = media_download_url
             .map(str::trim)
             .filter(|url| !url.is_empty())
-            .ok_or(ZipHunterError::InvalidInput(
-                "media_download_url is empty when zip main entry is missing",
-            ))?;
+        else {
+            return Ok(scan);
+        };
 
         let staging_dir = scan
             .staging_dir
@@ -200,7 +206,19 @@ async fn download_main_to_staging(
     date: &str,
     mid: &str,
 ) -> Result<PathBuf, ZipHunterError> {
-    let response = reqwest::get(media_download_url).await?;
+    let client = reqwest::Client::new();
+    let get_response = client.get(media_download_url).send().await?;
+
+    let response = if get_response.status() == reqwest::StatusCode::METHOD_NOT_ALLOWED {
+        eprintln!(
+            "[zip-hunter] GET returned 405 for fallback URL, retrying POST (mid={})",
+            mid
+        );
+        client.post(media_download_url).send().await?
+    } else {
+        get_response
+    };
+
     let status = response.status();
 
     if !status.is_success() {
@@ -404,9 +422,12 @@ fn extract_entry_to_staging(
     let mut archive = zip::ZipArchive::new(file)?;
     let mut zip_file = archive.by_index(entry.entry_index)?;
 
-    let staged_file_name = Path::new(&entry.entry_name)
-        .file_name()
-        .ok_or(ZipHunterError::InvalidInput("matched zip entry has no file name"))?;
+    let staged_file_name =
+        Path::new(&entry.entry_name)
+            .file_name()
+            .ok_or(ZipHunterError::InvalidInput(
+                "matched zip entry has no file name",
+            ))?;
     let staged_path = staging_dir.join(staged_file_name);
     let mut staged_file = std::fs::File::create(&staged_path)?;
     std::io::copy(&mut zip_file, &mut staged_file)?;
@@ -503,7 +524,8 @@ mod tests {
 
     #[tokio::test]
     async fn scans_entries_and_extracts_only_matched_files_into_staging() {
-        let temp_dir = tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
+        let temp_dir =
+            tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
         let first_zip_path = temp_dir.path().join("part-1.zip");
         let second_zip_path = temp_dir.path().join("part-2.zip");
 
@@ -536,7 +558,9 @@ mod tests {
         assert_eq!(scan.mid, "alpha");
         assert_eq!(scan.entries.len(), 3);
         assert_eq!(
-            scan.main_entry.as_ref().map(|entry| entry.entry_name.as_str()),
+            scan.main_entry
+                .as_ref()
+                .map(|entry| entry.entry_name.as_str()),
             Some("exports/2026-02-20_alpha-main.mp4")
         );
         assert_eq!(
@@ -547,11 +571,21 @@ mod tests {
         );
         assert_eq!(
             scan.staged_main_path.as_deref(),
-            Some(temp_dir.path().join(".staging/2026-02-20_alpha-main.mp4").as_path())
+            Some(
+                temp_dir
+                    .path()
+                    .join(".staging/2026-02-20_alpha-main.mp4")
+                    .as_path()
+            )
         );
         assert_eq!(
             scan.staged_overlay_path.as_deref(),
-            Some(temp_dir.path().join(".staging/2026-02-20_alpha-overlay.png").as_path())
+            Some(
+                temp_dir
+                    .path()
+                    .join(".staging/2026-02-20_alpha-overlay.png")
+                    .as_path()
+            )
         );
 
         assert!(scan.entries.iter().any(|entry| {
@@ -569,7 +603,9 @@ mod tests {
             "matched main file should be extracted into .staging"
         );
 
-        let extracted_overlay_path = temp_dir.path().join(".staging/2026-02-20_alpha-overlay.png");
+        let extracted_overlay_path = temp_dir
+            .path()
+            .join(".staging/2026-02-20_alpha-overlay.png");
         assert!(
             extracted_overlay_path.exists(),
             "matched overlay file should be extracted into .staging"
@@ -589,12 +625,16 @@ mod tests {
             .await
             .expect_err("empty zip path list should be rejected");
 
-        assert!(matches!(error, ZipHunterError::InvalidInput("zip_paths is empty")));
+        assert!(matches!(
+            error,
+            ZipHunterError::InvalidInput("zip_paths is empty")
+        ));
     }
 
     #[tokio::test]
     async fn matches_only_entries_for_the_requested_date_and_mid() {
-        let temp_dir = tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
+        let temp_dir =
+            tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
         let zip_path = temp_dir.path().join("part-1.zip");
 
         write_zip_fixture(
@@ -613,7 +653,9 @@ mod tests {
             .expect("zip scan should succeed");
 
         assert_eq!(
-            scan.main_entry.as_ref().map(|entry| entry.entry_name.as_str()),
+            scan.main_entry
+                .as_ref()
+                .map(|entry| entry.entry_name.as_str()),
             Some("exports/2026-02-20_alpha-main.mp4")
         );
         assert_eq!(
@@ -626,7 +668,8 @@ mod tests {
 
     #[tokio::test]
     async fn verification_extracts_only_the_target_main_file_into_staging() {
-        let temp_dir = tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
+        let temp_dir =
+            tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
         let zip_path = temp_dir.path().join("part-1.zip");
 
         write_zip_fixture(
@@ -663,17 +706,18 @@ mod tests {
 
     #[tokio::test]
     async fn downloads_main_file_into_staging_when_zip_match_is_missing() {
-        let temp_dir = tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
+        let temp_dir =
+            tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
         let zip_path = temp_dir.path().join("part-1.zip");
-        write_zip_fixture(&zip_path, &[("exports/2026-02-20_alpha-overlay.png", b"overlay")])
-            .expect("zip fixture should be written");
-
-        let (download_url, server_handle) = start_single_response_http_server(
-            "200 OK",
-            b"downloaded-video",
-            "video/mp4",
+        write_zip_fixture(
+            &zip_path,
+            &[("exports/2026-02-20_alpha-overlay.png", b"overlay")],
         )
-        .expect("http server should start");
+        .expect("zip fixture should be written");
+
+        let (download_url, server_handle) =
+            start_single_response_http_server("200 OK", b"downloaded-video", "video/mp4")
+                .expect("http server should start");
 
         let scan = find_and_extract_memory(
             &[zip_path],
@@ -705,8 +749,26 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn returns_missing_scan_without_error_when_no_fallback_url_is_supplied() {
+        let temp_dir =
+            tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
+        let zip_path = temp_dir.path().join("part-1.zip");
+        write_zip_fixture(&zip_path, &[("exports/readme.txt", b"hello")])
+            .expect("zip fixture should be written");
+
+        let scan = find_and_extract_memory(&[zip_path], "2026-02-20", "missing-mid", None, None)
+            .await
+            .expect("missing local entries without fallback URL should not error");
+
+        assert!(scan.staged_main_path.is_none());
+        assert!(scan.staged_overlay_path.is_none());
+        assert!(!scan.used_network_fallback);
+    }
+
+    #[tokio::test]
     async fn marks_memory_as_failed_network_when_fallback_download_fails() {
-        let temp_dir = tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
+        let temp_dir =
+            tempfile::tempdir().expect("temp dir should be created for zip hunter tests");
         let zip_path = temp_dir.path().join("part-1.zip");
         write_zip_fixture(&zip_path, &[("exports/readme.txt", b"hello")])
             .expect("zip fixture should be written");
@@ -735,12 +797,9 @@ mod tests {
 
         pool.close().await;
 
-        let (download_url, server_handle) = start_single_response_http_server(
-            "500 Internal Server Error",
-            b"boom",
-            "text/plain",
-        )
-        .expect("http server should start");
+        let (download_url, server_handle) =
+            start_single_response_http_server("500 Internal Server Error", b"boom", "text/plain")
+                .expect("http server should start");
 
         let error = find_and_extract_memory(
             &[zip_path],
@@ -756,7 +815,10 @@ mod tests {
             .join()
             .expect("http server thread should complete successfully");
 
-        assert!(matches!(error, ZipHunterError::HttpStatus(reqwest::StatusCode::INTERNAL_SERVER_ERROR)));
+        assert!(matches!(
+            error,
+            ZipHunterError::HttpStatus(reqwest::StatusCode::INTERNAL_SERVER_ERROR)
+        ));
 
         let verification_pool = sqlx::SqlitePool::connect(&database_url)
             .await

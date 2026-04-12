@@ -6,9 +6,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use chrono::{DateTime, NaiveDate, NaiveDateTime};
 
 use super::geocoder;
-use sha2::{Digest, Sha256};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use sqlx::SqlitePool;
 
 /// Typed representation of a single entry in the modern Snapchat JSON export.
@@ -138,7 +138,10 @@ impl Display for ParserError {
             }
             Self::Join(error) => write!(f, "failed to run zip extraction task: {error}"),
             Self::InvalidSchema(reason) => {
-                write!(f, "memories history json does not match expected schema: {reason}")
+                write!(
+                    f,
+                    "memories history json does not match expected schema: {reason}"
+                )
             }
             Self::Json(error) => write!(f, "failed to parse memories history json: {error}"),
             Self::Database(error) => write!(f, "failed to persist memories into sqlite: {error}"),
@@ -192,6 +195,7 @@ struct ParsedMemoryItem {
     location_resolved: Option<String>,
     media_type: String,
     media_url: String,
+    media_download_url: Option<String>,
     overlay_url: Option<String>,
 }
 
@@ -213,7 +217,9 @@ pub async fn import_memories_history_file(
     Ok(summary.imported_count)
 }
 
-pub async fn validate_memories_history_file(memories_history_path: &Path) -> Result<(), ParserError> {
+pub async fn validate_memories_history_file(
+    memories_history_path: &Path,
+) -> Result<(), ParserError> {
     let json_content = load_memories_history_json(memories_history_path).await?;
     validate_memories_history_json_content(&json_content)
 }
@@ -242,7 +248,9 @@ pub async fn load_memories_history_json(input_path: &Path) -> Result<String, Par
     }
 }
 
-async fn extract_memories_history_json_to_temp(zip_path: &Path) -> Result<std::path::PathBuf, ParserError> {
+async fn extract_memories_history_json_to_temp(
+    zip_path: &Path,
+) -> Result<std::path::PathBuf, ParserError> {
     let zip_path = zip_path.to_path_buf();
 
     tokio::task::spawn_blocking(move || {
@@ -320,13 +328,14 @@ pub async fn import_memories_history_json(
 
         sqlx::query(
             "
-            INSERT INTO MemoryItem (date, location, media_url, overlay_url, status, date_time, location_resolved)
-            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            INSERT INTO MemoryItem (date, location, media_url, media_download_url, overlay_url, status, date_time, location_resolved)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
             ",
         )
         .bind(&item.date)
         .bind(&item.location)
         .bind(&item.media_url)
+        .bind(&item.media_download_url)
         .bind(&item.overlay_url)
         .bind("queued")
         .bind(&item.date_time)
@@ -337,7 +346,11 @@ pub async fn import_memories_history_json(
         imported_count += 1;
 
         let parsed_date = normalize_date_component(&item.date);
-        let mid = extract_mid_from_download_link(&item.media_url);
+        let mid = extract_mid_from_download_link(&item.media_url).or_else(|| {
+            item.media_download_url
+                .as_deref()
+                .and_then(extract_mid_from_download_link)
+        });
         let memory_hash = build_memory_hash(
             &parsed_date,
             &item.media_type,
@@ -386,12 +399,13 @@ pub async fn import_memories_history_json(
         .await?;
 
         if chunk_exists == 0 {
-            let order_index = if let Some(next_order_index) = next_chunk_order_by_hash.get_mut(&memory_hash) {
-                let current_order_index = *next_order_index;
-                *next_order_index += 1;
-                current_order_index
-            } else {
-                let next_order_index = sqlx::query_scalar::<_, Option<i64>>(
+            let order_index =
+                if let Some(next_order_index) = next_chunk_order_by_hash.get_mut(&memory_hash) {
+                    let current_order_index = *next_order_index;
+                    *next_order_index += 1;
+                    current_order_index
+                } else {
+                    let next_order_index = sqlx::query_scalar::<_, Option<i64>>(
                     "SELECT COALESCE(MAX(order_index), 0) FROM MediaChunks WHERE memory_id = ?1",
                 )
                 .bind(memory_id)
@@ -400,9 +414,9 @@ pub async fn import_memories_history_json(
                 .unwrap_or(0)
                     + 1;
 
-                next_chunk_order_by_hash.insert(memory_hash.clone(), next_order_index + 1);
-                next_order_index
-            };
+                    next_chunk_order_by_hash.insert(memory_hash.clone(), next_order_index + 1);
+                    next_order_index
+                };
 
             sqlx::query(
                 "
@@ -493,12 +507,7 @@ fn scan_schema_signals(
 fn is_supported_snapchat_container_key(key: &str) -> bool {
     matches!(
         key,
-        "Saved Media"
-            | "Saved Stories"
-            | "Memories"
-            | "memories"
-            | "savedMedia"
-            | "saved_memories"
+        "Saved Media" | "Saved Stories" | "Memories" | "memories" | "savedMedia" | "saved_memories"
     )
 }
 
@@ -527,6 +536,17 @@ fn parse_memory_item(value: &Value) -> Option<ParsedMemoryItem> {
         return None;
     };
 
+    let media_download_url = first_non_empty_string(
+        value,
+        &[
+            "media_download_url",
+            "mediaDownloadUrl",
+            "Media Download Url",
+            "download_url",
+            "downloadUrl",
+        ],
+    );
+
     let media_url = first_non_empty_string(
         value,
         &[
@@ -534,12 +554,11 @@ fn parse_memory_item(value: &Value) -> Option<ParsedMemoryItem> {
             "mediaUrl",
             "download_link",
             "downloadLink",
-            "download_url",
-            "downloadUrl",
             "Media URL",
             "Download Link",
         ],
-    )?;
+    )
+    .or_else(|| media_download_url.clone())?;
 
     let overlay_url = first_non_empty_string(
         value,
@@ -580,6 +599,7 @@ fn parse_memory_item(value: &Value) -> Option<ParsedMemoryItem> {
         location_resolved,
         media_type,
         media_url,
+        media_download_url,
         overlay_url,
     })
 }
@@ -704,7 +724,9 @@ async fn get_active_job_id(
     match query_result {
         Ok(job_id) => Ok(job_id),
         Err(sqlx::Error::Database(database_error))
-            if database_error.message().contains("no such table: ExportJobs") =>
+            if database_error
+                .message()
+                .contains("no such table: ExportJobs") =>
         {
             Ok(None)
         }
@@ -1011,8 +1033,14 @@ mod tests {
 
     #[test]
     fn normalizes_date_to_yyyy_mm_dd() {
-        assert_eq!(normalize_date_component("2024-03-01T23:15:59Z"), "2024-03-01");
-        assert_eq!(normalize_date_component("2024-03-01 23:15:59"), "2024-03-01");
+        assert_eq!(
+            normalize_date_component("2024-03-01T23:15:59Z"),
+            "2024-03-01"
+        );
+        assert_eq!(
+            normalize_date_component("2024-03-01 23:15:59"),
+            "2024-03-01"
+        );
         assert_eq!(normalize_date_component("2024-03-01"), "2024-03-01");
     }
 
@@ -1185,6 +1213,7 @@ mod tests {
                 location TEXT,
                 location_resolved TEXT,
                 media_url TEXT NOT NULL,
+                media_download_url TEXT,
                 overlay_url TEXT,
                 status TEXT NOT NULL
             )
@@ -1297,20 +1326,40 @@ mod tests {
 
         // Verify first item enrichment
         let row1_date_time: Option<String> = enriched_rows[0].try_get("date_time").ok();
-        let row1_location_resolved: Option<String> = enriched_rows[0].try_get("location_resolved").ok();
-        assert!(row1_date_time.is_some(), "first item should have date_time after import enrichment");
-        assert!(row1_location_resolved.is_some(), "first item should have location_resolved after import enrichment");
+        let row1_location_resolved: Option<String> =
+            enriched_rows[0].try_get("location_resolved").ok();
+        assert!(
+            row1_date_time.is_some(),
+            "first item should have date_time after import enrichment"
+        );
+        assert!(
+            row1_location_resolved.is_some(),
+            "first item should have location_resolved after import enrichment"
+        );
         if let Some(loc) = row1_location_resolved {
-            assert!(loc.contains("Germany"), "Munich coordinates should resolve to Germany");
+            assert!(
+                loc.contains("Germany"),
+                "Munich coordinates should resolve to Germany"
+            );
         }
 
         // Verify second item enrichment
         let row2_date_time: Option<String> = enriched_rows[1].try_get("date_time").ok();
-        let row2_location_resolved: Option<String> = enriched_rows[1].try_get("location_resolved").ok();
-        assert!(row2_date_time.is_some(), "second item should have date_time after import enrichment");
-        assert!(row2_location_resolved.is_some(), "second item should have location_resolved after import enrichment");
+        let row2_location_resolved: Option<String> =
+            enriched_rows[1].try_get("location_resolved").ok();
+        assert!(
+            row2_date_time.is_some(),
+            "second item should have date_time after import enrichment"
+        );
+        assert!(
+            row2_location_resolved.is_some(),
+            "second item should have location_resolved after import enrichment"
+        );
         if let Some(loc) = row2_location_resolved {
-            assert!(loc.contains("United States"), "NYC coordinates should resolve to United States");
+            assert!(
+                loc.contains("United States"),
+                "NYC coordinates should resolve to United States"
+            );
         }
 
         // Step 3: Verify COALESCE fallback works (simulating SQL query layer)
@@ -1321,7 +1370,10 @@ mod tests {
         .await
         .expect("COALESCE fallback query should work");
 
-        assert!(coalesce_result.contains("T") && coalesce_result.contains("Z"), "should return ISO 8601 format from date_time");
+        assert!(
+            coalesce_result.contains("T") && coalesce_result.contains("Z"),
+            "should return ISO 8601 format from date_time"
+        );
 
         verification_pool.close().await;
     }

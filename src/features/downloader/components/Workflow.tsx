@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { open, message } from "@tauri-apps/plugin-dialog";
 import { Archive, PackageOpen, FolderOpen } from "lucide-react";
 
@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { DOWNLOADER_SESSION_STORAGE_KEY, readAppSettings, writeAppSettings } from "@/lib/app-settings";
 import { ActionBar } from "@/features/downloader/components/ActionBar";
 import { LiveConsole } from "@/features/downloader/components/LiveConsole";
+import { MissingFilesCard } from "@/features/downloader/components/MissingFilesCard";
 import { ProgressOverview } from "@/features/downloader/components/ProgressOverview";
 import { ZipSelector } from "@/features/downloader/components/ZipSelector";
 import { ZipStatus } from "@/features/downloader/components/ZipStatus";
@@ -20,14 +21,18 @@ import {
   getDiskSpace,
   getExportPath,
   getFilesTotalSize,
+  getMissingFileByMemoryItemId,
+  getMissingFiles,
   getProcessingSessionOverview,
   importMemoriesFromZip,
+  downloadQueuedMemories,
   importViewerExportZip,
   initializeZipSession,
   type DownloadErrorCode,
   onDownloadProgress,
   onProcessProgress,
   onSessionLog,
+  processDownloadedMemories,
   processMemoriesFromZipArchives,
   resumeProcessingSession,
   setExportPath,
@@ -38,6 +43,7 @@ import {
   type DownloadProgressPayload,
   type ImageOutputFormat,
   type ImageQuality,
+  type MissingFileItem,
   type ThumbnailQuality,
   type ProcessErrorCode,
   type ProcessProgressPayload,
@@ -95,8 +101,21 @@ export function Workflow() {
   const [activeZip, setActiveZip] = useState<string | null>(null);
   const [finishedZipFiles, setFinishedZipFiles] = useState<string[]>([]);
   const [duplicatesSkipped, setDuplicatesSkipped] = useState(0);
+  const [missingFiles, setMissingFiles] = useState(0);
   const [processedFiles, setProcessedFiles] = useState(0);
   const [logLines, setLogLines] = useState<string[]>([]);
+  const [missingList, setMissingList] = useState<MissingFileItem[]>([]);
+  const [isLoadingMissingList, setIsLoadingMissingList] = useState(false);
+  const [isDownloadingMissing, setIsDownloadingMissing] = useState(false);
+  const [missingDownloadTarget, setMissingDownloadTarget] = useState(0);
+
+  const downloadedBaseRef = useRef(0);
+  const processedBaseRef = useRef(0);
+  const isDownloadingMissingRef = useRef(false);
+
+  useEffect(() => {
+    isDownloadingMissingRef.current = isDownloadingMissing;
+  }, [isDownloadingMissing]);
 
   const [importState, setImportState] = useState<ImportState>("idle");
   const [totalFiles, setTotalFiles] = useState(0);
@@ -133,6 +152,7 @@ export function Workflow() {
         activeZip: string | null;
         finishedZipFiles: string[];
         duplicatesSkipped: number;
+        missingFiles: number;
         processedFiles: number;
         totalFiles: number;
         downloadedFiles: number;
@@ -149,6 +169,7 @@ export function Workflow() {
       setActiveZip(persisted.activeZip ?? null);
       setFinishedZipFiles(persisted.finishedZipFiles ?? []);
       setDuplicatesSkipped(persisted.duplicatesSkipped ?? 0);
+      setMissingFiles(persisted.missingFiles ?? 0);
       setProcessedFiles(persisted.processedFiles ?? 0);
       setTotalFiles(persisted.totalFiles ?? 0);
       setDownloadedFiles(persisted.downloadedFiles ?? 0);
@@ -179,6 +200,7 @@ export function Workflow() {
           activeZip,
           finishedZipFiles,
           duplicatesSkipped,
+          missingFiles,
           processedFiles,
           totalFiles,
           downloadedFiles,
@@ -198,6 +220,7 @@ export function Workflow() {
     activeZip,
     downloadedFiles,
     duplicatesSkipped,
+    missingFiles,
     finishedZipFiles,
     isPaused,
     isStopped,
@@ -230,6 +253,7 @@ export function Workflow() {
     setTotalFiles(overview.totalFiles);
     setDownloadedFiles(overview.downloadedFiles);
     setProcessedFiles(overview.processedFiles);
+    setMissingFiles(overview.missingFiles);
     setDuplicatesSkipped(overview.duplicatesSkipped);
     setIsPaused(overview.isPaused);
     setIsStopped(overview.isStopped);
@@ -241,6 +265,49 @@ export function Workflow() {
       setImportState("running");
     } else {
       setImportState("idle");
+    }
+  };
+
+  const refreshMissingList = async () => {
+    if (missingFiles <= 0) {
+      setMissingList([]);
+      return;
+    }
+
+    setIsLoadingMissingList(true);
+    try {
+      const items = await getMissingFiles();
+      setMissingList(items);
+    } catch (error) {
+      console.error("[downloader] Failed to load missing files list", error);
+      setMissingList([]);
+    } finally {
+      setIsLoadingMissingList(false);
+    }
+  };
+
+  const appendMissingListItem = async (memoryItemId: number) => {
+    if (!Number.isFinite(memoryItemId) || memoryItemId <= 0) {
+      return;
+    }
+
+    try {
+      const item = await getMissingFileByMemoryItemId(memoryItemId);
+      if (!item) {
+        return;
+      }
+
+      setMissingList((previous) => {
+        if (previous.some((entry) => entry.memoryItemId === item.memoryItemId)) {
+          return previous;
+        }
+
+        const next = [...previous, item];
+        next.sort((left, right) => left.memoryGroupId - right.memoryGroupId);
+        return next;
+      });
+    } catch (error) {
+      console.error("[downloader] Failed to append missing file item", error);
     }
   };
 
@@ -281,6 +348,10 @@ export function Workflow() {
       return t("downloader.workflow.error.download.CONCURRENCY_ERROR");
     }
 
+    if (errorCode === "STOPPED") {
+      return "Download stopped by user.";
+    }
+
     return t("downloader.workflow.error.download.INTERNAL_ERROR");
   };
 
@@ -310,6 +381,14 @@ export function Workflow() {
   }, [t]);
 
   useEffect(() => {
+    if (missingFiles <= 0 || isLoadingMissingList || missingList.length > 0) {
+      return;
+    }
+
+    void refreshMissingList();
+  }, [isLoadingMissingList, missingFiles, missingList.length]);
+
+  useEffect(() => {
     let unlistenDownload: (() => void) | null = null;
     let unlistenProcess: (() => void) | null = null;
     let unlistenSessionLog: (() => void) | null = null;
@@ -317,21 +396,35 @@ export function Workflow() {
 
     const startListeners = async () => {
       const downloadUnlisten = await onDownloadProgress((payload: DownloadProgressPayload) => {
+        const isMissingRun = isDownloadingMissingRef.current;
+        const cumulativeDownloaded = isMissingRun
+          ? downloadedBaseRef.current + payload.successfulFiles
+          : payload.successfulFiles;
+
+        if (payload.status === "success") {
+          pushLogLine(
+            `[DOWNLOAD] ${payload.completedFiles}/${payload.totalFiles} completed (${payload.successfulFiles} ok, ${payload.failedFiles} failed)`,
+          );
+        }
+
+        if (payload.status === "stopped") {
+          pushLogLine("[DOWNLOAD] Download loop stopped by user");
+        }
+
         if (payload.status === "error") {
           console.error("[downloader] Download progress error event", payload);
           pushLogLine(`[ERROR] Download failed: ${translateDownloadErrorCode(payload.errorCode)}`);
         }
 
         setDownloadProgress({
-          totalFiles: payload.totalFiles,
+          totalFiles: isMissingRun ? missingDownloadTarget : payload.totalFiles,
           completedFiles: payload.completedFiles,
-          successfulFiles: payload.successfulFiles,
+          successfulFiles: isMissingRun ? payload.successfulFiles : cumulativeDownloaded,
           failedFiles: payload.failedFiles,
           status: payload.status,
           errorCode: payload.errorCode,
         });
-        setTotalFiles(payload.totalFiles);
-        setDownloadedFiles(payload.successfulFiles);
+        setDownloadedFiles(cumulativeDownloaded);
 
         if (payload.status === "error") {
           setNotice(translateDownloadErrorCode(payload.errorCode), "error");
@@ -359,18 +452,30 @@ export function Workflow() {
           console.error("[downloader] Process progress error details", JSON.stringify(payload, null, 2));
 
           pushLogLine(`[ERROR] Processing failed for memory: ${translateProcessErrorCode(payload.errorCode)}`);
+        } else if (payload.status === "missing") {
+          setMissingFiles((previous) => previous + 1);
+          if (payload.memoryItemId !== null) {
+            void appendMissingListItem(payload.memoryItemId);
+          }
         }
 
         setProcessProgress({
           totalFiles: payload.totalFiles,
           completedFiles: payload.completedFiles,
-          successfulFiles: payload.successfulFiles,
+          successfulFiles: isDownloadingMissingRef.current
+            ? processedBaseRef.current + payload.successfulFiles
+            : payload.successfulFiles,
           failedFiles: payload.failedFiles,
           status: payload.status,
           errorCode: payload.errorCode,
         });
         setTotalFiles((previous) => Math.max(previous, payload.totalFiles));
-        setProcessedFiles(payload.successfulFiles);
+        setProcessedFiles((previous) => {
+          const next = isDownloadingMissingRef.current
+            ? processedBaseRef.current + payload.successfulFiles
+            : payload.successfulFiles;
+          return Math.max(previous, next);
+        });
 
         if (payload.status === "duplicate") {
           setDuplicatesSkipped((previous) => previous + 1);
@@ -414,7 +519,7 @@ export function Workflow() {
         unlistenSessionLog();
       }
     };
-  }, [t]);
+  }, [t, missingDownloadTarget]);
 
   const progressValue = useMemo(() => {
     if (totalFiles <= 0) {
@@ -422,10 +527,10 @@ export function Workflow() {
     }
 
     // During live processing: completedFiles counts all items (success + error + duplicate)
-    // After processing / on reload: use processedFiles + duplicatesSkipped as completed work
-    const completed = processProgress?.completedFiles ?? (processedFiles + duplicatesSkipped);
+    // After processing / on reload: use processed + duplicate + missing as completed work
+    const completed = processProgress?.completedFiles ?? (processedFiles + duplicatesSkipped + missingFiles);
     return Math.min(100, Math.round((completed / totalFiles) * 100));
-  }, [processProgress?.completedFiles, processedFiles, duplicatesSkipped, totalFiles]);
+  }, [processProgress?.completedFiles, processedFiles, duplicatesSkipped, missingFiles, totalFiles]);
 
   const isWorking = importState !== "idle";
   const showHardwareDisclaimer = isMobile || selectedZipPaths.length > 4;
@@ -437,6 +542,7 @@ export function Workflow() {
   const canClear =
     (selectedZipPaths.length > 0 || jobId !== null || finishedZipFiles.length > 0 || logLines.length > 0) &&
     (!isWorking || isStopped);
+  const canDownloadAllMissing = !isWorking && (isStopped || finishedZipFiles.length > 0);
   const isViewerImportBlockedByZipSelection = selectedZipPaths.length > 0;
   const areTopWorkflowSectionsDisabled = isWorking || isImportingViewerArchive;
 
@@ -652,11 +758,15 @@ export function Workflow() {
       setLogLines([]);
       setFinishedZipFiles([]);
       setDuplicatesSkipped(0);
+      setMissingFiles(0);
+      setMissingList([]);
       setProcessedFiles(0);
       setDownloadProgress(null);
       setProcessProgress(null);
       setIsPaused(false);
       setIsStopped(false);
+      downloadedBaseRef.current = 0;
+      processedBaseRef.current = 0;
 
       setImportState("running");
       setValidationState("validating");
@@ -731,10 +841,27 @@ export function Workflow() {
         processResult.failedCount > 0 ? "error" : "success",
       );
 
+      setMissingFiles(processResult.missingCount);
+      setMissingDownloadTarget(processResult.missingCount);
+
+      if (processResult.missingCount > 0) {
+        pushLogLine(
+          `[${new Date().toISOString().slice(0, 10)}] ${processResult.missingCount} media file(s) were not found in provided ZIPs`,
+        );
+      }
+
       await finalizeZipSession(zipSession.jobId);
       setFinishedZipFiles(orderedZipSelection.map((zip) => zip.fileName));
 
       await refreshSessionOverview();
+      await refreshMissingList();
+      setNotice(
+        processResult.missingCount > 0
+          ? "ZIP import finished. Review missing files below."
+          : "ZIP import finished successfully.",
+        "success",
+      );
+      setIsStopped(true);
     } catch (error) {
       console.error("Upload failed:", error);
       const message = resolveUploadErrorMessage(error);
@@ -755,6 +882,7 @@ export function Workflow() {
     setActiveZip(null);
     setFinishedZipFiles([]);
     setDuplicatesSkipped(0);
+    setMissingFiles(0);
     setProcessedFiles(0);
     setTotalFiles(0);
     setDownloadedFiles(0);
@@ -768,12 +896,74 @@ export function Workflow() {
     setStorageAcknowledged(false);
     setHardwareAcknowledged(false);
     setEstimatedBytes(0);
+    setMissingList([]);
+    setMissingDownloadTarget(0);
     setNotice(t("downloader.workflow.status.idle"));
 
     try {
       window.localStorage.removeItem(DOWNLOADER_SESSION_STORAGE_KEY);
     } catch (error) {
       console.error("[downloader] Failed to clear persisted session state", error);
+    }
+  };
+
+  const onDownloadAllMissing = async () => {
+    if (isDownloadingMissing || missingFiles <= 0) {
+      return;
+    }
+
+    const rateLimitSettings = loadRateLimitSettings();
+    const thumbnailQuality = loadThumbnailQualitySetting();
+    const processingFormatSettings = loadProcessingFormatSettings();
+
+    try {
+      setIsDownloadingMissing(true);
+      setImportState("running");
+      setIsStopped(false);
+      setIsPaused(false);
+      downloadedBaseRef.current = downloadedFiles;
+      processedBaseRef.current = processedFiles;
+      setMissingDownloadTarget(missingFiles);
+      await resumeProcessingSession();
+
+      setNotice("Downloading missing files...");
+      const downloadedMissingCount = await downloadQueuedMemories(".raw_cache", rateLimitSettings);
+
+      setNotice("Processing downloaded missing files...");
+      const missingProcessResult = await processDownloadedMemories(
+        ".raw_cache",
+        false,
+        thumbnailQuality,
+        processingFormatSettings.videoProfile,
+        processingFormatSettings.imageOutputFormat,
+        processingFormatSettings.imageQuality,
+      );
+
+      await stopProcessingSession();
+      setIsStopped(true);
+      await refreshSessionOverview();
+      await refreshMissingList();
+
+      setNotice(
+        `Downloaded ${downloadedMissingCount} file(s). Processed ${missingProcessResult.processedCount}, failed ${missingProcessResult.failedCount}.`,
+        missingProcessResult.failedCount > 0 ? "error" : "success",
+      );
+      pushLogLine(
+        `[DOWNLOAD] Missing download finished: ${downloadedMissingCount} downloaded, ${missingProcessResult.processedCount} processed, ${missingProcessResult.failedCount} failed`,
+      );
+    } catch (error) {
+      console.error("[downloader] failed to download/process missing files", error);
+      setNotice(t("downloader.workflow.error.generic"), "error");
+    } finally {
+      try {
+        await stopProcessingSession();
+        setIsStopped(true);
+      } catch {
+        // best-effort stop transition
+      }
+      setImportState("idle");
+      setIsDownloadingMissing(false);
+      setMissingDownloadTarget(0);
     }
   };
 
@@ -969,6 +1159,8 @@ export function Workflow() {
         totalFiles={totalFiles}
         processedFiles={processedFiles}
         downloadedFiles={downloadedFiles}
+        missingFiles={missingFiles}
+        missingDownloadTarget={missingDownloadTarget}
         duplicatesSkipped={duplicatesSkipped}
         downloadProgress={downloadProgress}
         processProgress={processProgress}
@@ -976,6 +1168,16 @@ export function Workflow() {
         isStopped={isStopped}
         importState={importState}
       />
+
+      {missingFiles > 0 && (
+        <MissingFilesCard
+          items={missingList}
+          isLoading={isLoadingMissingList}
+          isDownloading={isDownloadingMissing}
+          canDownloadAll={canDownloadAllMissing}
+          onDownloadAll={() => { void onDownloadAllMissing(); }}
+        />
+      )}
 
       {/* Status Notice */}
       {statusMessage && (
