@@ -319,6 +319,7 @@ export function Workflow() {
       const downloadUnlisten = await onDownloadProgress((payload: DownloadProgressPayload) => {
         if (payload.status === "error") {
           console.error("[downloader] Download progress error event", payload);
+          pushLogLine(`[ERROR] Download failed: ${translateDownloadErrorCode(payload.errorCode)}`);
         }
 
         setDownloadProgress({
@@ -356,6 +357,8 @@ export function Workflow() {
           );
           console.error("[downloader] Process progress error event", payload);
           console.error("[downloader] Process progress error details", JSON.stringify(payload, null, 2));
+
+          pushLogLine(`[ERROR] Processing failed for memory: ${translateProcessErrorCode(payload.errorCode)}`);
         }
 
         setProcessProgress({
