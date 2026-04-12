@@ -112,6 +112,8 @@ export function Workflow() {
   const downloadedBaseRef = useRef(0);
   const processedBaseRef = useRef(0);
   const isDownloadingMissingRef = useRef(false);
+  const isSessionResettingRef = useRef(false);
+  const panelStateEpochRef = useRef(0);
 
   useEffect(() => {
     isDownloadingMissingRef.current = isDownloadingMissing;
@@ -248,7 +250,13 @@ export function Workflow() {
   };
 
   const refreshSessionOverview = async () => {
+    const epoch = panelStateEpochRef.current;
     const overview = await getProcessingSessionOverview();
+
+    if (isSessionResettingRef.current || epoch !== panelStateEpochRef.current) {
+      return;
+    }
+
     setJobId(overview.jobId);
     setTotalFiles(overview.totalFiles);
     setDownloadedFiles(overview.downloadedFiles);
@@ -269,6 +277,8 @@ export function Workflow() {
   };
 
   const refreshMissingList = async () => {
+    const epoch = panelStateEpochRef.current;
+
     if (missingFiles <= 0) {
       setMissingList([]);
       return;
@@ -277,6 +287,11 @@ export function Workflow() {
     setIsLoadingMissingList(true);
     try {
       const items = await getMissingFiles();
+
+      if (isSessionResettingRef.current || epoch !== panelStateEpochRef.current) {
+        return;
+      }
+
       setMissingList(items);
     } catch (error) {
       console.error("[downloader] Failed to load missing files list", error);
@@ -287,12 +302,19 @@ export function Workflow() {
   };
 
   const appendMissingListItem = async (memoryItemId: number) => {
+    const epoch = panelStateEpochRef.current;
+
     if (!Number.isFinite(memoryItemId) || memoryItemId <= 0) {
       return;
     }
 
     try {
       const item = await getMissingFileByMemoryItemId(memoryItemId);
+
+      if (isSessionResettingRef.current || epoch !== panelStateEpochRef.current) {
+        return;
+      }
+
       if (!item) {
         return;
       }
@@ -396,6 +418,10 @@ export function Workflow() {
 
     const startListeners = async () => {
       const downloadUnlisten = await onDownloadProgress((payload: DownloadProgressPayload) => {
+        if (isSessionResettingRef.current) {
+          return;
+        }
+
         const isMissingRun = isDownloadingMissingRef.current;
         const cumulativeDownloaded = isMissingRun
           ? downloadedBaseRef.current + payload.successfulFiles
@@ -439,6 +465,10 @@ export function Workflow() {
       unlistenDownload = downloadUnlisten;
 
       const processUnlisten = await onProcessProgress((payload: ProcessProgressPayload) => {
+        if (isSessionResettingRef.current) {
+          return;
+        }
+
         if (payload.status === "error") {
           const conciseReason = payload.errorMessage
             ? payload.errorMessage.slice(0, 400)
@@ -494,6 +524,10 @@ export function Workflow() {
       unlistenProcess = processUnlisten;
 
       const sessionLogUnlisten = await onSessionLog((payload) => {
+        if (isSessionResettingRef.current) {
+          return;
+        }
+
         pushLogLine(payload.message);
       });
 
@@ -874,10 +908,15 @@ export function Workflow() {
   };
 
   const onRemoveSelection = () => {
+    isSessionResettingRef.current = true;
+    panelStateEpochRef.current += 1;
+
     resumeProcessingSession().catch((error) => {
       console.error("[downloader] Failed to reset backend processing state on clear", error);
     });
+
     setSelectedZipPaths([]);
+    setImportState("idle");
     setJobId(null);
     setActiveZip(null);
     setFinishedZipFiles([]);
@@ -888,6 +927,8 @@ export function Workflow() {
     setDownloadedFiles(0);
     setDownloadProgress(null);
     setProcessProgress(null);
+    setIsLoadingMissingList(false);
+    setIsDownloadingMissing(false);
     setIsPaused(false);
     setIsStopped(false);
     setLogLines([]);
@@ -898,6 +939,9 @@ export function Workflow() {
     setEstimatedBytes(0);
     setMissingList([]);
     setMissingDownloadTarget(0);
+    downloadedBaseRef.current = 0;
+    processedBaseRef.current = 0;
+    isDownloadingMissingRef.current = false;
     setNotice(t("downloader.workflow.status.idle"));
 
     try {
@@ -905,6 +949,10 @@ export function Workflow() {
     } catch (error) {
       console.error("[downloader] Failed to clear persisted session state", error);
     }
+
+    Promise.resolve().then(() => {
+      isSessionResettingRef.current = false;
+    });
   };
 
   const onDownloadAllMissing = async () => {
