@@ -208,7 +208,7 @@ const enMessages = {
 
   "downloader.zipSelector.title": "Snapchat ZIP Exports",
   "downloader.zipSelector.description":
-    "Select ZIP exports named mydata~<uuid> (main) and optional mydata~<uuid> <num> parts. The main ZIP must include json/memories_history.json.",
+    "Select ZIP exports named mydata~<uuid> (main) and optional mydata~<uuid>-<num> parts. The main ZIP must include json/memories_history.json.",
   "downloader.zipSelector.browse": "Browse ZIP files",
   "downloader.zipSelector.clear": "Clear",
   "downloader.zipSelector.changePick": "Change selection",
@@ -580,7 +580,7 @@ const deMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Snapchat-ZIP-Exporte",
   "downloader.zipSelector.description":
-    "ZIP-Exporte mit dem Namen mydata~<uuid> (Haupt) und optionalen mydata~<uuid> <num> Teilen auswählen. Die Haupt-ZIP muss json/memories_history.json enthalten.",
+    "ZIP-Exporte mit dem Namen mydata~<uuid> (Haupt) und optionalen mydata~<uuid>-<num> Teilen auswählen. Die Haupt-ZIP muss json/memories_history.json enthalten.",
   "downloader.zipSelector.browse": "ZIP-Dateien auswählen",
   "downloader.zipSelector.clear": "Löschen",
   "downloader.zipSelector.changePick": "Auswahl ändern",
@@ -944,7 +944,7 @@ const frMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Exports ZIP Snapchat",
   "downloader.zipSelector.description":
-    "Selectionnez les exports ZIP nommes mydata~<uuid> (principal) et les parties optionnelles mydata~<uuid> <num>. Le ZIP principal doit contenir json/memories_history.json.",
+    "Selectionnez les exports ZIP nommes mydata~<uuid> (principal) et les parties optionnelles mydata~<uuid>-<num>. Le ZIP principal doit contenir json/memories_history.json.",
   "downloader.zipSelector.browse": "Parcourir les fichiers ZIP",
   "downloader.zipSelector.clear": "Effacer",
   "downloader.zipSelector.changePick": "Changer la selection",
@@ -1308,7 +1308,7 @@ const esMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Exportaciones ZIP de Snapchat",
   "downloader.zipSelector.description":
-    "Selecciona exportaciones ZIP llamadas mydata~<uuid> (principal) y partes opcionales mydata~<uuid> <num>. El ZIP principal debe incluir json/memories_history.json.",
+    "Selecciona exportaciones ZIP llamadas mydata~<uuid> (principal) y partes opcionales mydata~<uuid>-<num>. El ZIP principal debe incluir json/memories_history.json.",
   "downloader.zipSelector.browse": "Buscar archivos ZIP",
   "downloader.zipSelector.clear": "Borrar",
   "downloader.zipSelector.changePick": "Cambiar seleccion",
@@ -1672,7 +1672,7 @@ const itMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Esportazioni ZIP Snapchat",
   "downloader.zipSelector.description":
-    "Seleziona esportazioni ZIP chiamate mydata~<uuid> (principale) e parti opzionali mydata~<uuid> <num>. Il file ZIP principale deve includere json/memories_history.json.",
+    "Seleziona esportazioni ZIP chiamate mydata~<uuid> (principale) e parti opzionali mydata~<uuid>-<num>. Il file ZIP principale deve includere json/memories_history.json.",
   "downloader.zipSelector.browse": "Sfoglia file ZIP",
   "downloader.zipSelector.clear": "Cancella",
   "downloader.zipSelector.changePick": "Cambia selezione",
@@ -2036,7 +2036,7 @@ const plMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Eksporty ZIP Snapchat",
   "downloader.zipSelector.description":
-    "Wybierz eksporty ZIP nazwane mydata~<uuid> (glowny) oraz opcjonalne czesci mydata~<uuid> <num>. Glowny ZIP musi zawierac json/memories_history.json.",
+    "Wybierz eksporty ZIP nazwane mydata~<uuid> (glowny) oraz opcjonalne czesci mydata~<uuid>-<num>. Glowny ZIP musi zawierac json/memories_history.json.",
   "downloader.zipSelector.browse": "Przegladaj pliki ZIP",
   "downloader.zipSelector.clear": "Wyczysc",
   "downloader.zipSelector.changePick": "Zmien wybor",
@@ -2400,7 +2400,7 @@ const nlMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Snapchat ZIP-exports",
   "downloader.zipSelector.description":
-    "Selecteer ZIP-exports met naam mydata~<uuid> (hoofd) en optionele delen mydata~<uuid> <num>. De hoofd-ZIP moet json/memories_history.json bevatten.",
+    "Selecteer ZIP-exports met naam mydata~<uuid> (hoofd) en optionele delen mydata~<uuid>-<num>. De hoofd-ZIP moet json/memories_history.json bevatten.",
   "downloader.zipSelector.browse": "Blader door ZIP-bestanden",
   "downloader.zipSelector.clear": "Wissen",
   "downloader.zipSelector.changePick": "Selectie wijzigen",
@@ -2764,7 +2764,7 @@ const ptMessages: Record<TranslationKey, string> = {
 
   "downloader.zipSelector.title": "Exportacoes ZIP do Snapchat",
   "downloader.zipSelector.description":
-    "Seleciona exportacoes ZIP chamadas mydata~<uuid> (principal) e partes opcionais mydata~<uuid> <num>. O ZIP principal deve incluir json/memories_history.json.",
+    "Seleciona exportacoes ZIP chamadas mydata~<uuid> (principal) e partes opcionais mydata~<uuid>-<num>. O ZIP principal deve incluir json/memories_history.json.",
   "downloader.zipSelector.browse": "Procurar ficheiros ZIP",
   "downloader.zipSelector.clear": "Limpar",
   "downloader.zipSelector.changePick": "Mudar selecao",

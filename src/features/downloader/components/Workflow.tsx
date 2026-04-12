@@ -235,6 +235,13 @@ export function Workflow() {
     setIsStopped(overview.isStopped);
     setActiveZip(overview.activeZip);
     setFinishedZipFiles(overview.finishedZipFiles);
+
+    // Sync import state with backend: if there's an active job, we're running
+    if (overview.jobId !== null && !overview.isStopped) {
+      setImportState("running");
+    } else {
+      setImportState("idle");
+    }
   };
 
   const resolveUploadErrorMessage = (error: unknown): string => {
