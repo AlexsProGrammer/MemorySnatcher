@@ -13,6 +13,22 @@ type LiveConsoleProps = {
   logLines: string[];
 };
 
+function getLineClass(line: string): string {
+  if (line.includes("[ERROR]")) return "text-red-400";
+  if (
+    line.includes("[WARN]") ||
+    line.includes("[MISSING]") ||
+    line.includes("[SKIP]") ||
+    line.includes("[DEBUG]")
+  ) return "text-yellow-400";
+  if (
+    line.includes("[IMPORT]") ||
+    line.includes("[DOWNLOAD]") ||
+    line.includes("[PROCESS]")
+  ) return "text-emerald-400";
+  return "text-muted-foreground";
+}
+
 export function LiveConsole({ logLines }: LiveConsoleProps) {
   const { t } = useI18n();
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -59,13 +75,13 @@ export function LiveConsole({ logLines }: LiveConsoleProps) {
             ref={scrollRef}
             role="log"
             aria-live="polite"
-            className="h-64 overflow-auto rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed text-muted-foreground"
+            className="h-64 overflow-auto rounded-md bg-muted/50 p-3 font-mono text-xs leading-relaxed"
           >
             {logLines.length === 0 ? (
-              <p className="italic">{t("downloader.console.empty")}</p>
+              <p className="italic text-muted-foreground">{t("downloader.console.empty")}</p>
             ) : (
               logLines.map((line, index) => (
-                <p key={`${index}-${line.slice(0, 20)}`}>{line}</p>
+                <p key={`${index}-${line.slice(0, 20)}`} className={getLineClass(line)}>{line}</p>
               ))
             )}
           </div>

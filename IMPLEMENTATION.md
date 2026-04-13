@@ -9,25 +9,15 @@ thumbnails are not reloaded in the viewer since update to be more consistent wit
 
 
 
-when i restart the app, and a session will automaticly start in run state
+when i restart the app the last session will start in run state. here the button are all in state like its running and status also showing running. here i checked nothing is actually running, no process or funciton. here it seems only visual that the state is wrong after restarting the app. here check and fix this.
 
 
 
-mark files where overlay failed in db
-general seems that all videos are missing the overlay. here analyze the codebase and the files. why this happens?
-
-
-
-data reset failed after running the extractor
-	not fully resset, logs, status. also seems that depsite stopped a mp4 was still running in bg, which maybe failed the reset data through settings. here also fully shutdown the downloader/extractor scripts
+next please fix a small bug when i reset data while running the extractor, here it fails and shows error msg.
+	also sometimes it not fully reset, logs, status. also seems that depsite stopped a mp4 was still running in bg, which maybe failed the reset data through settings. here also fully shutdown the downloader/extractor scripts function when reset data
 
 
 
 
 pelase update the logs on the downlaoder/extractor page. use timestamp for current time, eg [10:19:40]. than state if its a import img or video and also dispaly its date, format (vid/img) and mid (id of the memory). here update all logs to be better for user to dispaly information. also maybe colored eg for error red; or issues/skip, missing yellow
-
-
-
-
-next please help and add spacing between side bar menu items. here add some gap between the viewer, extractor and settings sidebar items. also add some gap between the confirm window settings reset data reset and cancel button.
 

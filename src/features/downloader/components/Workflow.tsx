@@ -97,6 +97,11 @@ function loadProcessingFormatSettings(): ProcessingFormatSettings {
   };
 }
 
+function nowTs(): string {
+  const now = new Date();
+  return `[${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}:${String(now.getSeconds()).padStart(2, "0")}]`;
+}
+
 export function Workflow() {
   const { t } = useI18n();
   const [selectedZipPaths, setSelectedZipPaths] = useState<string[]>([]);
@@ -435,17 +440,17 @@ export function Workflow() {
 
         if (payload.status === "success") {
           pushLogLine(
-            `[DOWNLOAD] ${payload.completedFiles}/${payload.totalFiles} completed (${payload.successfulFiles} ok, ${payload.failedFiles} failed)`,
+            `${nowTs()} [DOWNLOAD] ${payload.completedFiles}/${payload.totalFiles} · ✓${payload.successfulFiles} ok · ✗${payload.failedFiles} failed`,
           );
         }
 
         if (payload.status === "stopped") {
-          pushLogLine("[DOWNLOAD] Download loop stopped by user");
+          pushLogLine(`${nowTs()} [INFO] Download stopped by user`);
         }
 
         if (payload.status === "error") {
           console.error("[downloader] Download progress error event", payload);
-          pushLogLine(`[ERROR] Download failed: ${translateDownloadErrorCode(payload.errorCode)}`);
+          pushLogLine(`${nowTs()} [ERROR] Download failed: ${translateDownloadErrorCode(payload.errorCode)}`);
         }
 
         setDownloadProgress({
@@ -506,10 +511,7 @@ export function Workflow() {
           }
           console.error("[downloader] Process progress error details", JSON.stringify(payload, null, 2));
 
-          pushLogLine(`[ERROR] Processing failed for memory: ${translateProcessErrorCode(payload.errorCode)}`);
-          pushLogLine(
-            `[DEBUG] stage=${debugStage} date=${debugDate} mid=${debugMid} zip=${debugZip}`,
-          );
+          pushLogLine(`${nowTs()} [ERROR] Processing failed: ${translateProcessErrorCode(payload.errorCode)} · mid=${debugMid} · date=${debugDate} · stage=${debugStage}`);
         } else if (payload.status === "success" && payload.debugStage === "process.success.overlay_fallback") {
           const debugDate = payload.debugDate ?? "unknown";
           const debugMid = payload.debugMid ?? "unknown";
@@ -522,13 +524,36 @@ export function Workflow() {
             `[downloader] process-overlay-fallback memoryItemId=${payload.memoryItemId ?? "unknown"} date=${debugDate} mid=${debugMid} zip=${debugZip} reason=${fallbackReason}`,
           );
           pushLogLine(
-            `[DEBUG] Overlay fallback memoryItemId=${payload.memoryItemId ?? "unknown"} date=${debugDate} mid=${debugMid} zip=${debugZip}`,
+            `${nowTs()} [WARN] Overlay fallback · mid=${debugMid} · date=${debugDate} · zip=${debugZip}`,
           );
+        } else if (payload.status === "success") {
+          const mid = payload.debugMid;
+          const date = payload.debugDate;
+          const parts: string[] = [];
+          if (mid) parts.push(`mid=${mid}`);
+          if (date) parts.push(`date=${date}`);
+          const meta = parts.length > 0 ? ` · ${parts.join(" · ")}` : ` · item ${payload.completedFiles}/${payload.totalFiles}`;
+          pushLogLine(`${nowTs()} [IMPORT]${meta}`);
+        } else if (payload.status === "duplicate") {
+          const mid = payload.debugMid;
+          const date = payload.debugDate;
+          const parts: string[] = [];
+          if (mid) parts.push(`mid=${mid}`);
+          if (date) parts.push(`date=${date}`);
+          const meta = parts.length > 0 ? ` · ${parts.join(" · ")}` : "";
+          pushLogLine(`${nowTs()} [SKIP] Duplicate skipped${meta}`);
         } else if (payload.status === "missing") {
           setMissingFiles((previous) => previous + 1);
           if (payload.memoryItemId !== null) {
             void appendMissingListItem(payload.memoryItemId);
           }
+          const mid = payload.debugMid;
+          const date = payload.debugDate;
+          const parts: string[] = [];
+          if (mid) parts.push(`mid=${mid}`);
+          if (date) parts.push(`date=${date}`);
+          const missingMeta = parts.length > 0 ? ` · ${parts.join(" · ")}` : "";
+          pushLogLine(`${nowTs()} [MISSING] Not found in ZIPs${missingMeta}`);
         }
 
         setProcessProgress({
@@ -873,7 +898,7 @@ export function Workflow() {
       setJobId(zipSession.jobId);
       setActiveZip(zipSession.activeZip);
       pushLogLine(
-        `[${new Date().toISOString().slice(0, 10)}] ZIP session ${zipSession.jobId} initialized (main: ${mainZip.fileName}, parts: ${Math.max(0, zipPaths.length - 1)})`,
+        `${nowTs()} [INFO] ZIP session ${zipSession.jobId} initialized · main: ${mainZip.fileName} · parts: ${Math.max(0, zipPaths.length - 1)}`,
       );
 
       setValidationState("valid");
@@ -887,23 +912,20 @@ export function Workflow() {
         setDuplicatesSkipped((previous) => previous + summary.skippedDuplicates);
       }
       pushLogLine(
-        `[${new Date().toISOString().slice(0, 10)}] Loaded ${summary.parsedCount} memories from memories_history.json; imported ${summary.importedCount} records (${summary.skippedDuplicates} duplicates skipped on import)`,
+        `${nowTs()} [INFO] Loaded ${summary.parsedCount} memories · imported ${summary.importedCount} records · ${summary.skippedDuplicates} duplicates skipped`,
       );
 
       const rateLimitSettings = loadRateLimitSettings();
       if (rateLimitSettings) {
         pushLogLine(
-          `[${new Date().toISOString().slice(0, 10)}] ZIP-first mode active; network download is fallback only`,
+          `${nowTs()} [INFO] ZIP-first mode active; network download is fallback only`,
         );
       }
 
       const thumbnailQuality = loadThumbnailQualitySetting();
       const processingFormatSettings = loadProcessingFormatSettings();
       pushLogLine(
-        `[${new Date().toISOString().slice(0, 10)}] Thumbnail quality set to ${thumbnailQuality}`,
-      );
-      pushLogLine(
-        `[${new Date().toISOString().slice(0, 10)}] Video profile=${processingFormatSettings.videoProfile}, image format=${processingFormatSettings.imageOutputFormat}, image quality=${processingFormatSettings.imageQuality}`,
+        `${nowTs()} [INFO] Settings · thumbnail=${thumbnailQuality} · video=${processingFormatSettings.videoProfile} · img-format=${processingFormatSettings.imageOutputFormat} · img-quality=${processingFormatSettings.imageQuality}`,
       );
 
       setNotice(t("downloader.workflow.status.processing"));
@@ -931,7 +953,7 @@ export function Workflow() {
 
       if (processResult.missingCount > 0) {
         pushLogLine(
-          `[${new Date().toISOString().slice(0, 10)}] ${processResult.missingCount} media file(s) were not found in provided ZIPs`,
+          `${nowTs()} [WARN] ${processResult.missingCount} media file(s) not found in provided ZIPs`,
         );
       }
 
@@ -1050,7 +1072,7 @@ export function Workflow() {
         missingProcessResult.failedCount > 0 ? "error" : "success",
       );
       pushLogLine(
-        `[DOWNLOAD] Missing download finished: ${downloadedMissingCount} downloaded, ${missingProcessResult.processedCount} processed, ${missingProcessResult.failedCount} failed`,
+        `${nowTs()} [DOWNLOAD] Missing files done · downloaded: ${downloadedMissingCount} · processed: ${missingProcessResult.processedCount} · failed: ${missingProcessResult.failedCount}`,
       );
     } catch (error) {
       console.error("[downloader] failed to download/process missing files", error);
@@ -1073,11 +1095,11 @@ export function Workflow() {
       if (isPaused) {
         await resumeProcessingSession();
         setIsPaused(false);
-        pushLogLine(`[${new Date().toISOString().slice(0, 10)}] Resume requested`);
+        pushLogLine(`${nowTs()} [INFO] Resume requested`);
       } else {
         await setProcessingPaused(true);
         setIsPaused(true);
-        pushLogLine(`[${new Date().toISOString().slice(0, 10)}] Pause requested`);
+        pushLogLine(`${nowTs()} [INFO] Pause requested`);
       }
     } catch (error) {
       console.error("[downloader] pause/resume failed", error);
@@ -1090,7 +1112,7 @@ export function Workflow() {
       await stopProcessingSession();
       setIsStopped(true);
       setIsPaused(false);
-      pushLogLine(`[${new Date().toISOString().slice(0, 10)}] Stop requested`);
+      pushLogLine(`${nowTs()} [INFO] Stop requested`);
       setNotice("Stop requested. Remaining files will stay pending.", "error");
       await refreshSessionOverview();
     } catch (error) {

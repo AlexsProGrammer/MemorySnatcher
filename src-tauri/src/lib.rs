@@ -739,8 +739,8 @@ async fn download_queued_memories(
     emit_session_log(
         &window,
         format!(
-            "[{}] Download session started (output: {})",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            "[{}] [INFO] Download session started · output: {}",
+            chrono::Local::now().format("%H:%M:%S"),
             resolved_output_dir.display()
         ),
     )?;
@@ -844,8 +844,8 @@ async fn download_queued_memories(
                 emit_session_log(
                     &window,
                     format!(
-                        "[{}] Downloaded memory item {}",
-                        chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                        "[{}] [DOWNLOAD] Downloaded memory item {}",
+                        chrono::Local::now().format("%H:%M:%S"),
                         download_result.memory_item_id
                     ),
                 )?;
@@ -891,8 +891,8 @@ async fn download_queued_memories(
                     emit_session_log(
                         &window,
                         format!(
-                            "[{}] Download paused/stopped by user",
-                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+                            "[{}] [INFO] Download paused/stopped by user",
+                            chrono::Local::now().format("%H:%M:%S")
                         ),
                     )?;
                     break;
@@ -1079,8 +1079,8 @@ async fn download_queued_memories(
     emit_session_log(
         &window,
         format!(
-            "[{}] Download phase finished: {} success, {} retryable, {} expired, {} failed",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            "[{}] [INFO] Download phase finished · success: {} · retryable: {} · expired: {} · failed: {}",
+            chrono::Local::now().format("%H:%M:%S"),
             successful_downloads,
             remaining_retryable,
             remaining_expired,
@@ -1937,8 +1937,8 @@ async fn process_downloaded_memories(
     emit_session_log(
         &window,
         format!(
-            "[{}] Processing phase started",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S")
+            "[{}] [INFO] Processing phase started",
+            chrono::Local::now().format("%H:%M:%S")
         ),
     )?;
 
@@ -2056,8 +2056,8 @@ async fn process_downloaded_memories(
         emit_session_log(
             &window,
             format!(
-                "[{}] Processing date {} item {} ({}/{})",
-                chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                "[{}] [PROCESS] date={} · item={} · ({}/{})",
+                chrono::Local::now().format("%H:%M:%S"),
                 unit.date_taken,
                 unit.progress_item_id,
                 index + 1,
@@ -2387,8 +2387,8 @@ async fn process_downloaded_memories(
             emit_session_log(
                 &window,
                 format!(
-                    "[{}] Overlay fallback used for memory_item_id={} date={} reason={}",
-                    chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+                    "[{}] [WARN] Overlay fallback · item={} · date={} · reason={}",
+                    chrono::Local::now().format("%H:%M:%S"),
                     unit.progress_item_id,
                     unit.date_taken,
                     fallback_reason
@@ -2474,8 +2474,8 @@ async fn process_downloaded_memories(
     emit_session_log(
         &window,
         format!(
-            "[{}] Processing phase finished: {} processed, {} failed",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            "[{}] [INFO] Processing phase finished · processed: {} · failed: {}",
+            chrono::Local::now().format("%H:%M:%S"),
             processed_count,
             failed_count
         ),
@@ -2565,8 +2565,8 @@ async fn process_memories_from_zip_archives(
     emit_session_log(
         &window,
         format!(
-            "[{}] ZIP-first processing started with {} archive(s)",
-            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
+            "[{}] [INFO] ZIP-first processing started with {} archive(s)",
+            chrono::Local::now().format("%H:%M:%S"),
             zip_paths.len()
         ),
     )?;
@@ -2596,9 +2596,10 @@ async fn process_memories_from_zip_archives(
         emit_session_log(
             &window,
             format!(
-                "[{}] Extracting mid {} from ZIP archives ({}/{})",
-                memory_date,
+                "[{}] [IMPORT] Extracting · mid={} · date={} · ({}/{})",
+                chrono::Local::now().format("%H:%M:%S"),
                 memory_mid.chars().take(8).collect::<String>(),
+                memory_date,
                 index + 1,
                 total_files
             ),
@@ -2653,9 +2654,10 @@ async fn process_memories_from_zip_archives(
                 emit_session_log(
                     &window,
                     format!(
-                        "[{}] Timeout while scanning ZIP archives for mid {} (>{}s)",
-                        memory_date,
+                        "[{}] [ERROR] Timeout scanning ZIPs · mid={} · date={} · (>{}s)",
+                        chrono::Local::now().format("%H:%M:%S"),
                         memory_mid.chars().take(8).collect::<String>(),
+                        memory_date,
                         ZIP_HUNTER_TIMEOUT_SECS
                     ),
                 )?;
@@ -2827,10 +2829,11 @@ async fn process_memories_from_zip_archives(
             emit_session_log(
                 &window,
                 format!(
-                    "[{}] Using ZIP {} for mid {}",
-                    memory_date,
+                    "[{}] [IMPORT] Using ZIP {} · mid={} · date={}",
+                    chrono::Local::now().format("%H:%M:%S"),
                     active_zip_name,
-                    memory_mid.chars().take(8).collect::<String>()
+                    memory_mid.chars().take(8).collect::<String>(),
+                    memory_date
                 ),
             )?;
         }
@@ -2877,9 +2880,10 @@ async fn process_memories_from_zip_archives(
                 emit_session_log(
                     &window,
                     format!(
-                        "[{}] Timeout while processing mid {} (>{}s); skipping item",
-                        memory_date,
+                        "[{}] [ERROR] Timeout processing media · mid={} · date={} · (>{}s)",
+                        chrono::Local::now().format("%H:%M:%S"),
                         memory_mid.chars().take(8).collect::<String>(),
+                        memory_date,
                         PROCESS_MEDIA_TIMEOUT_SECS
                     ),
                 )?;
@@ -2996,10 +3000,10 @@ async fn process_memories_from_zip_archives(
                     emit_session_log(
                         &window,
                         format!(
-                            "[{}] Overlay fallback used for date={} mid={} zip={} reason={}",
-                            chrono::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                            memory_date,
+                            "[{}] [WARN] Overlay fallback · mid={} · date={} · zip={} · reason={}",
+                            chrono::Local::now().format("%H:%M:%S"),
                             short_mid,
+                            memory_date,
                             zip_name,
                             fallback_reason
                         ),
