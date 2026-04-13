@@ -873,7 +873,7 @@ export function SettingsForm() {
                   {t("settings.form.reset.confirm")}
                 </DialogDescription>
               </DialogHeader>
-              <DialogFooter className="gap-2 sm:gap-0">
+              <DialogFooter className="gap-2 sm:gap-3">
                 <DialogClose asChild>
                   <Button type="button" variant="outline">
                     {t("settings.form.reset.cancel")}

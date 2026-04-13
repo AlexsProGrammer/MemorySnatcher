@@ -66,7 +66,7 @@ export function AppSidebar({ activeTab, onTabChange }: AppSidebarProps) {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="gap-2">
               {navItems.map((item) => {
                 const Icon = NAV_ICONS[item.key];
                 return (
