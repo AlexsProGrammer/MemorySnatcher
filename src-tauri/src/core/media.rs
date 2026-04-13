@@ -1,6 +1,10 @@
 use std::fmt::{Display, Formatter};
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
+
+const FFMPEG_TIMEOUT_SECS: u64 = 50;
+const FFMPEG_POLL_INTERVAL_MS: u64 = 200;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum MediaKind {
@@ -278,10 +282,38 @@ pub async fn cleanup_intermediate_files(
 fn run_ffmpeg(args: Vec<String>) -> Result<(), MediaError> {
     eprintln!("[ffmpeg] cmd: ffmpeg {}", args.join(" "));
 
-    let output = Command::new("ffmpeg")
+    let mut child = Command::new("ffmpeg")
         .args(&args)
-        .output()
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
         .map_err(MediaError::Io)?;
+
+    let started_at = Instant::now();
+    let output = loop {
+        if child.try_wait().map_err(MediaError::Io)?.is_some() {
+            break child.wait_with_output().map_err(MediaError::Io)?;
+        }
+
+        if started_at.elapsed() >= Duration::from_secs(FFMPEG_TIMEOUT_SECS) {
+            let _ = child.kill();
+            let timeout_output = child.wait_with_output().map_err(MediaError::Io)?;
+            let timeout_stderr = String::from_utf8_lossy(&timeout_output.stderr).to_string();
+
+            return Err(MediaError::FfmpegFailed {
+                status: None,
+                stderr: format!(
+                    "ffmpeg timed out after {}s{}{}",
+                    FFMPEG_TIMEOUT_SECS,
+                    if timeout_stderr.trim().is_empty() { "" } else { "; stderr: " },
+                    timeout_stderr.trim()
+                ),
+            });
+        }
+
+        std::thread::sleep(Duration::from_millis(FFMPEG_POLL_INTERVAL_MS));
+    };
 
     let stderr_text = String::from_utf8_lossy(&output.stderr);
 

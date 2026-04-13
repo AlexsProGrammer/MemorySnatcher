@@ -13,6 +13,8 @@ const APP_CONFIG_FILENAME: &str = "config.json";
 const MAX_PERSISTED_RETRY_ATTEMPTS: i64 = 3;
 const PROCESS_PROGRESS_EVENT: &str = "process-progress";
 const SESSION_LOG_EVENT: &str = "session-log";
+const ZIP_HUNTER_TIMEOUT_SECS: u64 = 60;
+const PROCESS_MEDIA_TIMEOUT_SECS: u64 = 60;
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -2470,15 +2472,83 @@ async fn process_memories_from_zip_archives(
             ),
         )?;
 
-        let zip_scan = match crate::core::zip_hunter::find_and_extract_memory(
-            &zip_paths,
-            &memory_date,
-            &memory_mid,
-            None,
-            Some(&database_url),
+        let zip_scan = match tokio::time::timeout(
+            std::time::Duration::from_secs(ZIP_HUNTER_TIMEOUT_SECS),
+            crate::core::zip_hunter::find_and_extract_memory(
+                &zip_paths,
+                &memory_date,
+                &memory_mid,
+                None,
+                Some(&database_url),
+            ),
         )
         .await
         {
+            Err(_) => {
+                failed_count += 1;
+
+                let timeout_message = format!(
+                    "zip scan timed out after {}s while resolving mid {}",
+                    ZIP_HUNTER_TIMEOUT_SECS,
+                    memory_mid.chars().take(8).collect::<String>()
+                );
+
+                sqlx::query(
+                    "
+                    UPDATE MemoryItem
+                    SET status = 'processing_failed',
+                        last_error_code = 'ZIP_HUNTER_TIMEOUT',
+                        last_error_message = ?1
+                    WHERE id = ?2
+                    ",
+                )
+                .bind(&timeout_message)
+                .bind(memory_item_id)
+                .execute(&pool)
+                .await
+                .map_err(|db_error| {
+                    format!("failed to update ZIP_HUNTER_TIMEOUT status: {db_error}")
+                })?;
+
+                sqlx::query("UPDATE Memories SET status = 'FAILED_NETWORK' WHERE id = ?1")
+                    .bind(memory_group_id)
+                    .execute(&pool)
+                    .await
+                    .map_err(|db_error| {
+                        format!("failed to update FAILED_NETWORK memory status: {db_error}")
+                    })?;
+
+                emit_session_log(
+                    &window,
+                    format!(
+                        "[{}] Timeout while scanning ZIP archives for mid {} (>{}s)",
+                        memory_date,
+                        memory_mid.chars().take(8).collect::<String>(),
+                        ZIP_HUNTER_TIMEOUT_SECS
+                    ),
+                )?;
+
+                window
+                    .emit(
+                        PROCESS_PROGRESS_EVENT,
+                        ProcessProgressPayload {
+                            total_files,
+                            completed_files: index + 1,
+                            successful_files: processed_count,
+                            failed_files: failed_count,
+                            memory_item_id: Some(memory_item_id),
+                            status: "error".to_string(),
+                            error_code: Some(ProcessErrorCode::ProcessingFailed),
+                            error_message: Some(timeout_message),
+                        },
+                    )
+                    .map_err(|emit_error| {
+                        format!("failed to emit zip-process timeout progress: {emit_error}")
+                    })?;
+
+                continue;
+            }
+            Ok(result) => match result {
             Ok(scan) => scan,
             Err(error) => {
                 failed_count += 1;
@@ -2528,6 +2598,7 @@ async fn process_memories_from_zip_archives(
 
                 continue;
             }
+            },
         };
 
         if zip_scan.staged_main_path.is_none() {
@@ -2617,7 +2688,8 @@ async fn process_memories_from_zip_archives(
             .map(|path| vec![path])
             .ok_or_else(|| "zip hunter did not produce staged main path".to_string())?;
 
-        let process_result =
+        let process_result = match tokio::time::timeout(
+            std::time::Duration::from_secs(PROCESS_MEDIA_TIMEOUT_SECS),
             crate::core::processor::process_media(crate::core::processor::ProcessMediaInput {
                 memory_item_id,
                 memory_group_id: Some(memory_group_id),
@@ -2633,8 +2705,68 @@ async fn process_memories_from_zip_archives(
                 image_quality,
                 keep_originals,
                 database_url: database_url.clone(),
-            })
-            .await;
+            }),
+        )
+        .await
+        {
+            Ok(result) => result,
+            Err(_) => {
+                failed_count += 1;
+
+                let timeout_message = format!(
+                    "media processing timed out after {}s for mid {}",
+                    PROCESS_MEDIA_TIMEOUT_SECS,
+                    memory_mid.chars().take(8).collect::<String>()
+                );
+
+                emit_session_log(
+                    &window,
+                    format!(
+                        "[{}] Timeout while processing mid {} (>{}s); skipping item",
+                        memory_date,
+                        memory_mid.chars().take(8).collect::<String>(),
+                        PROCESS_MEDIA_TIMEOUT_SECS
+                    ),
+                )?;
+
+                sqlx::query(
+                    "UPDATE MemoryItem SET status = 'processing_failed', last_error_code = 'PROCESSING_TIMEOUT', last_error_message = ?1 WHERE id = ?2",
+                )
+                .bind(&timeout_message)
+                .bind(memory_item_id)
+                .execute(&pool)
+                .await
+                .map_err(|db_error| format!("failed to update processing timeout memory item: {db_error}"))?;
+
+                sqlx::query("UPDATE Memories SET status = 'processing_failed' WHERE id = ?1")
+                    .bind(memory_group_id)
+                    .execute(&pool)
+                    .await
+                    .map_err(|db_error| {
+                        format!("failed to update processing timeout memory group: {db_error}")
+                    })?;
+
+                window
+                    .emit(
+                        PROCESS_PROGRESS_EVENT,
+                        ProcessProgressPayload {
+                            total_files,
+                            completed_files: index + 1,
+                            successful_files: processed_count,
+                            failed_files: failed_count,
+                            memory_item_id: Some(memory_item_id),
+                            status: "error".to_string(),
+                            error_code: Some(ProcessErrorCode::ProcessingFailed),
+                            error_message: Some(timeout_message),
+                        },
+                    )
+                    .map_err(|emit_error| {
+                        format!("failed to emit processing-timeout progress: {emit_error}")
+                    })?;
+
+                continue;
+            }
+        };
 
         match process_result {
             Ok(crate::core::processor::ProcessMediaResult::Duplicate { content_hash: _ }) => {
