@@ -443,7 +443,7 @@ export function ViewerPlaceholder() {
   );
 
   return (
-    <div className="mx-auto flex h-full w-full flex-col pb-8 md:pb-10">
+    <div className="mx-auto flex h-full w-full flex-col">
       {/* Page Header */}
       <div className="flex flex-col gap-3 pb-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
