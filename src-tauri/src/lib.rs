@@ -604,13 +604,6 @@ async fn setup_database(app: &tauri::AppHandle) -> Result<sqlx::SqlitePool, Stri
     .map_err(|error| format!("failed to create MemoryItem media_url index: {error}"))?;
 
     sqlx::query(
-        "CREATE INDEX IF NOT EXISTS idx_mediachunks_memid_order ON MediaChunks(memory_id, order_index)",
-    )
-    .execute(&pool)
-    .await
-    .map_err(|error| format!("failed to create MediaChunks memory_id/order_index index: {error}"))?;
-
-    sqlx::query(
         "CREATE TABLE IF NOT EXISTS MediaChunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 memory_id INTEGER NOT NULL,
@@ -623,6 +616,13 @@ async fn setup_database(app: &tauri::AppHandle) -> Result<sqlx::SqlitePool, Stri
     .execute(&pool)
     .await
     .map_err(|error| format!("failed to create MediaChunks table: {error}"))?;
+
+    sqlx::query(
+        "CREATE INDEX IF NOT EXISTS idx_mediachunks_memid_order ON MediaChunks(memory_id, order_index)",
+    )
+    .execute(&pool)
+    .await
+    .map_err(|error| format!("failed to create MediaChunks memory_id/order_index index: {error}"))?;
 
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS ExportJobs (

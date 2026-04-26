@@ -24,8 +24,7 @@
         "scope": {
           "allow": [
             "$APPDATA/**",
-            "$APPDATA/.raw_cache/**",
-            "$APPDATA/.raw_cache/.thumbnails/**"
+            "$HOME/**"
           ],
           "requireLiteralLeadingDot": false
         }
